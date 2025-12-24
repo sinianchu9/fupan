@@ -1,0 +1,127 @@
+import 'package:dio/dio.dart';
+import '../../models/add_event_request.dart';
+import '../../models/close_plan_request.dart';
+import '../../models/close_plan_response.dart';
+import '../session/user_session.dart';
+
+class ApiClient {
+  final Dio dio;
+  final UserSession userSession;
+
+  // 可以在此处配置 baseUrl
+  static const String defaultBaseUrl =
+      "https://pre-trade-journal.kingjoke1991.workers.dev";
+
+  ApiClient({required this.userSession, String? baseUrl})
+    : dio = Dio(
+        BaseOptions(
+          baseUrl: baseUrl ?? defaultBaseUrl,
+          connectTimeout: const Duration(seconds: 10),
+          receiveTimeout: const Duration(seconds: 10),
+        ),
+      ) {
+    dio.interceptors.add(
+      InterceptorsWrapper(
+        onRequest: (options, handler) {
+          options.headers['X-User-Id'] = userSession.userId;
+          return handler.next(options);
+        },
+        onResponse: (response, handler) {
+          final data = response.data;
+          if (data is Map<String, dynamic>) {
+            if (data['ok'] == false) {
+              return handler.reject(
+                DioException(
+                  requestOptions: response.requestOptions,
+                  response: response,
+                  error: data['error'] ?? 'Unknown error',
+                  type: DioExceptionType.badResponse,
+                ),
+              );
+            }
+          }
+          return handler.next(response);
+        },
+        onError: (DioException e, handler) {
+          // 统一错误处理
+          return handler.next(e);
+        },
+      ),
+    );
+  }
+
+  Future<Response<T>> get<T>(
+    String path, {
+    Map<String, dynamic>? queryParameters,
+  }) {
+    return dio.get<T>(path, queryParameters: queryParameters);
+  }
+
+  Future<Response<T>> post<T>(String path, {dynamic data}) {
+    return dio.post<T>(path, data: data);
+  }
+
+  // Step 2: 增加业务方法
+  Future<List<Map<String, dynamic>>> getWatchlist() async {
+    final response = await get('/watchlist');
+    return List<Map<String, dynamic>>.from(response.data['items'] ?? []);
+  }
+
+  Future<List<Map<String, dynamic>>> getPlans({String? status}) async {
+    final response = await get(
+      '/plans',
+      queryParameters: status != null ? {'status': status} : null,
+    );
+    return List<Map<String, dynamic>>.from(response.data['items'] ?? []);
+  }
+
+  Future<String> createPlan(Map<String, dynamic> data) async {
+    final response = await post('/plans/create', data: data);
+    return response.data['id'];
+  }
+
+  Future<Map<String, dynamic>> getPlanDetail(String planId) async {
+    final response = await get('/plans/$planId');
+    return response.data;
+  }
+
+  Future<void> armPlan(String planId) async {
+    await post('/plans/$planId/arm');
+  }
+
+  Future<void> updatePlan(String planId, Map<String, dynamic> patch) async {
+    await dio.post('/plans/$planId/update', data: patch);
+  }
+
+  Future<String> addEvent(String planId, AddEventRequest req) async {
+    final response = await dio.post(
+      '/plans/$planId/add-event',
+      data: req.toJson(),
+    );
+    return response.data['id'];
+  }
+
+  Future<ClosePlanResponse> closePlan(
+    String planId,
+    ClosePlanRequest req,
+  ) async {
+    final response = await dio.post('/plans/$planId/close', data: req.toJson());
+    return ClosePlanResponse.fromJson(response.data);
+  }
+
+  Future<List<Map<String, dynamic>>> getArchivedPlans({String? status}) async {
+    final response = await get(
+      '/plans/archived',
+      queryParameters: status != null ? {'status': status} : null,
+    );
+    return List<Map<String, dynamic>>.from(response.data['items'] ?? []);
+  }
+
+  Future<void> archivePlan(String planId) async {
+    await post('/plans/$planId/archive');
+  }
+
+  Future<void> unarchivePlan(String planId) async {
+    await post('/plans/$planId/unarchive');
+  }
+}

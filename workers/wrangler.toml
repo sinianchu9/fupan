@@ -1,0 +1,14 @@
+name = "pre-trade-journal"
+main = "src/index.ts"
+compatibility_date = "2025-12-24"
+
+[vars]
+APP_VERSION = "v1"
+# 订阅限制（可按需改）
+FREE_LIMIT = "1"
+PRO_LIMIT = "3"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "pre_trade_journal"
+database_id = "e324f3e4-f2f6-4613-bad4-612dbda86f13"

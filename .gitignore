@@ -1,0 +1,39 @@
+# --- Flutter / Dart ---
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+.pub-cache/
+.pub/
+build/
+
+# --- Node.js / Workers ---
+node_modules/
+.cache/
+dist/
+.env
+
+# --- Android ---
+.gradle/
+local.properties
+*.kwks
+*.keystore
+head.rev
+-sdk.dir
+.cxx/
+capture/
+
+# --- iOS/macOS ---
+*.mode1v3
+*.mode2v3
+*.moved-aside
+*.pbxuser
+*.perspectivev3
+DerivedData/
+Runner.xcworkspace/xcuserdata/
+
+# --- IDEs / System ---
+.vscode/
+.idea/
+.DS_Store
+*.log

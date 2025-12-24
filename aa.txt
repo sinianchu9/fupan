@@ -1,0 +1,163 @@
+参考 一 二 完成 三  四
+***** 一、D1：增加归档字段（最小 schema patch）
+
+
+
+ALTER TABLE trade_plans ADD COLUMN is_archived INTEGER NOT NULL DEFAULT 0;
+CREATE INDEX IF NOT EXISTS idx_plans_user_archived_updated
+ON trade_plans(user_id, is_archived, updated_at);
+
+
+注意：SQLite 的 ALTER TABLE ADD COLUMN 安全；老数据默认 is_archived=0。
+
+******二、Workers：实现“归档”接口 + 列表默认隐藏归档
+1）修改 GET /plans：默认只返回未归档
+
+把现有 /plans 查询从：
+
+WHERE p.user_id=? AND (?='' OR p.status=?)
+
+
+改成：
+
+WHERE p.user_id=?
+  AND p.is_archived=0
+  AND (?='' OR p.status=?)
+
+
+同时 SELECT 最好带上 p.is_archived（方便前端显示/调试）：
+
+SELECT p.id, p.status, p.direction, p.buy_reason_text,
+       p.target_low, p.target_high, p.created_at, p.updated_at,
+       p.is_archived,
+       s.code as symbol_code, s.name as symbol_name, s.industry as symbol_industry
+...
+
+2）新增 GET /plans/archived
+
+用于“已归档列表”页面，不污染主列表逻辑。
+
+// GET /plans/archived?status=
+if (method === "GET" && path === "/plans/archived") {
+  const status = (url.searchParams.get("status") || "").trim();
+  const rows = await env.DB.prepare(
+    `SELECT p.id, p.status, p.direction, p.buy_reason_text,
+            p.target_low, p.target_high, p.created_at, p.updated_at,
+            p.is_archived,
+            s.code as symbol_code, s.name as symbol_name, s.industry as symbol_industry
+     FROM trade_plans p
+     JOIN symbols s ON s.id=p.symbol_id
+     WHERE p.user_id=? AND p.is_archived=1 AND (?='' OR p.status=?)
+     ORDER BY p.updated_at DESC
+     LIMIT 200`
+  ).bind(userId, status, status).all();
+
+  return ok({ items: rows.results || [] });
+}
+
+3）新增 POST /plans/:id/archive 和 /plans/:id/unarchive
+
+规则建议（保持严肃性）：
+
+draft/armed/holding/closed 都允许归档（归档只是“从主视图移走”，不是删除）
+
+归档后仍能从 archived 列表查看详情（只读为主）
+
+插入到你路由里（靠近 plans 区域即可）：
+
+// POST /plans/:id/archive
+if (method === "POST" && path.startsWith("/plans/") && path.endsWith("/archive")) {
+  const planId = path.split("/")[2];
+  if (!planId) return bad("plan id required");
+
+  const plan = await getPlan(env, userId, planId);
+  if (!plan) return bad("not found", 404);
+
+  const ts = nowEpoch();
+  await env.DB.prepare(
+    `UPDATE trade_plans SET is_archived=1, updated_at=? WHERE id=? AND user_id=?`
+  ).bind(ts, planId, userId).run();
+
+  return ok();
+}
+
+// POST /plans/:id/unarchive
+if (method === "POST" && path.startsWith("/plans/") && path.endsWith("/unarchive")) {
+  const planId = path.split("/")[2];
+  if (!planId) return bad("plan id required");
+
+  const plan = await getPlan(env, userId, planId);
+  if (!plan) return bad("not found", 404);
+
+  const ts = nowEpoch();
+  await env.DB.prepare(
+    `UPDATE trade_plans SET is_archived=0, updated_at=? WHERE id=? AND user_id=?`
+  ).bind(ts, planId, userId).run();
+
+  return ok();
+}
+
+4）详情接口 GET /plans/:id：建议返回 plan.is_archived
+
+你 getPlan() 当前 SELECT p.*，只要加了列就会自动带上；前端可用它决定显示“取消归档”按钮。
+****************************完成以下任务*********************************
+三、Flutter：主列表加“归档入口”，并做一个“已归档”页
+1）ApiClient 增加方法（最少 3 个）
+
+getPlans()：保持不变（主列表默认未归档）
+
+getArchivedPlans()：调用 /plans/archived
+
+archivePlan(planId)：POST /plans/:id/archive
+
+unarchivePlan(planId)：POST /plans/:id/unarchive
+
+你现在已经有 plans list，照现有风格加即可。
+
+2）列表 UI：每张卡加 “⋯” 菜单 → 归档
+
+推荐交互：长按卡片或右上角 PopupMenuButton：
+
+归档（主列表）
+
+查看详情
+
+（已结束的卡也允许归档）
+
+归档成功后：
+
+直接从列表移除（本地删掉这条，或触发 refresh）
+
+弹 snackbar：“已归档，可在已归档中查看”
+
+3）添加一个“已归档”入口
+
+位置选择（最少改动）：
+
+复盘列表页 AppBar 右上角菜单：已归档
+
+进入 ArchivedPlansPage（结构复用 JournalListPage，只是数据源不同）
+
+ArchivedPlansPage 的每条卡菜单：
+
+取消归档（unarchive）
+
+查看详情
+
+四、计划完成后隐藏“添加事件”卡片（强制）
+
+
+在 PlanDetailPage 里加一个统一判断：
+
+final isClosed = detail.result != null || detail.plan.status == 'closed';
+
+
+然后：
+
+“新增事件”按钮：if (!isClosed) ...
+
+AddEventSheet：if (!isClosed) showModalBottomSheet(...)
+
+事件列表：仍显示（只读）
+
+修订按钮：我也建议 !isClosed 才显示（结束后不该再修订）
