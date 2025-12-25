@@ -5,6 +5,8 @@ import 'features/onboarding/onboarding_watchlist_page.dart';
 import 'features/shell/main_shell.dart';
 import 'models/watchlist_item.dart';
 
+import 'features/auth/login_page.dart';
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
@@ -17,12 +19,26 @@ void main() async {
   );
 }
 
+final navigatorKey = GlobalKey<NavigatorState>();
+
 class FupanApp extends ConsumerWidget {
   const FupanApp({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // Listen for auth state changes to handle 401/logout
+    ref.listen(userSessionProvider, (previous, next) {
+      if (previous?.isAuthenticated == true && next.isAuthenticated == false) {
+        // Redirect to login page when session is cleared (e.g., 401)
+        navigatorKey.currentState?.pushAndRemoveUntil(
+          MaterialPageRoute(builder: (context) => const LoginPage()),
+          (route) => false,
+        );
+      }
+    });
+
     return MaterialApp(
+      navigatorKey: navigatorKey,
       title: '交易前置复盘日记',
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(
@@ -50,10 +66,16 @@ class _StartupFlowState extends ConsumerState<StartupFlow> {
   @override
   void initState() {
     super.initState();
-    _checkWatchlist();
+    _initFlow();
   }
 
-  Future<void> _checkWatchlist() async {
+  Future<void> _initFlow() async {
+    final userSession = ref.read(userSessionProvider);
+    if (!userSession.isAuthenticated) {
+      setState(() => _isLoading = false);
+      return;
+    }
+
     try {
       final apiClient = ref.read(apiClientProvider);
       final response = await apiClient.get('/watchlist');
@@ -77,6 +99,11 @@ class _StartupFlowState extends ConsumerState<StartupFlow> {
   Widget build(BuildContext context) {
     if (_isLoading) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
+
+    final userSession = ref.watch(userSessionProvider);
+    if (!userSession.isAuthenticated) {
+      return const LoginPage();
     }
 
     if (_watchlist.isEmpty) {

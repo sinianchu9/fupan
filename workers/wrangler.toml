@@ -7,6 +7,12 @@ APP_VERSION = "v1"
 # 订阅限制（可按需改）
 FREE_LIMIT = "1"
 PRO_LIMIT = "3"
+JWT_ISSUER = "fupan"
+JWT_AUDIENCE = "fupan_app"
+
+# 用 wrangler secret 设置
+# wrangler secret put JWT_SECRET
+
 
 [[d1_databases]]
 binding = "DB"

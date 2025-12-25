@@ -23,7 +23,10 @@ class ApiClient {
     dio.interceptors.add(
       InterceptorsWrapper(
         onRequest: (options, handler) {
-          options.headers['X-User-Id'] = userSession.userId;
+          final token = userSession.token;
+          if (token != null && token.isNotEmpty) {
+            options.headers['Authorization'] = 'Bearer $token';
+          }
           return handler.next(options);
         },
         onResponse: (response, handler) {
@@ -42,8 +45,11 @@ class ApiClient {
           }
           return handler.next(response);
         },
-        onError: (DioException e, handler) {
-          // 统一错误处理
+        onError: (DioException e, handler) async {
+          if (e.response?.statusCode == 401) {
+            await userSession.clear();
+            // Note: UI redirection should be handled by a listener or router
+          }
           return handler.next(e);
         },
       ),
@@ -123,5 +129,27 @@ class ApiClient {
 
   Future<void> unarchivePlan(String planId) async {
     await post('/plans/$planId/unarchive');
+  }
+
+  Future<Map<String, dynamic>> getWeeklyReport() async {
+    final response = await get('/report/weekly');
+    return response.data;
+  }
+
+  // ---- self reviews (Step 7) ----
+  Future<String> submitSelfReview(
+    String planId,
+    Map<String, int> scores,
+  ) async {
+    final response = await post(
+      '/reviews/self',
+      data: {'plan_id': planId, ...scores},
+    );
+    return response.data['id'];
+  }
+
+  Future<Map<String, dynamic>?> getSelfReview(String planId) async {
+    final response = await get('/reviews/self/$planId');
+    return response.data['review'];
   }
 }

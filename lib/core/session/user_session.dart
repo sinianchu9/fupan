@@ -1,24 +1,27 @@
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:uuid/uuid.dart';
 
 class UserSession {
-  static const String _userIdKey = 'x_user_id';
-  String? _userId;
+  static const String _tokenKey = 'auth_token';
+  String? _token;
 
-  String get userId {
-    if (_userId == null) {
-      throw Exception('UserSession not initialized. Call init() first.');
-    }
-    return _userId!;
-  }
+  String? get token => _token;
+
+  bool get isAuthenticated => _token != null && _token!.isNotEmpty;
 
   Future<void> init() async {
     final prefs = await SharedPreferences.getInstance();
-    _userId = prefs.getString(_userIdKey);
+    _token = prefs.getString(_tokenKey);
+  }
 
-    if (_userId == null) {
-      _userId = const Uuid().v4();
-      await prefs.setString(_userIdKey, _userId!);
-    }
+  Future<void> setToken(String token) async {
+    _token = token;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_tokenKey, token);
+  }
+
+  Future<void> clear() async {
+    _token = null;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_tokenKey);
   }
 }

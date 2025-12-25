@@ -31,6 +31,35 @@ CREATE TABLE IF NOT EXISTS watchlist (
 
 CREATE INDEX IF NOT EXISTS idx_watchlist_user ON watchlist(user_id);
 
+-- users
+CREATE TABLE IF NOT EXISTS app_users (
+  id TEXT PRIMARY KEY,
+  email TEXT UNIQUE NOT NULL,
+  created_at INTEGER NOT NULL,
+  last_login_at INTEGER
+);
+
+-- otp codes (短期有效)
+CREATE TABLE IF NOT EXISTS login_otps (
+  id TEXT PRIMARY KEY,
+  email TEXT NOT NULL,
+  code_hash TEXT NOT NULL,
+  expires_at INTEGER NOT NULL,
+  attempts INTEGER NOT NULL DEFAULT 0,
+  created_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_login_otps_email ON login_otps(email);
+
+-- sessions (可用于拉黑、注销、设备管理)
+CREATE TABLE IF NOT EXISTS user_sessions (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL,
+  revoked INTEGER NOT NULL DEFAULT 0,
+  created_at INTEGER NOT NULL,
+  last_seen_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_user_sessions_user ON user_sessions(user_id);
+
 -- 交易计划（复盘核心）
 -- 状态：draft(可编辑) / armed(锁定) / holding / closed
 CREATE TABLE IF NOT EXISTS trade_plans (
@@ -39,6 +68,7 @@ CREATE TABLE IF NOT EXISTS trade_plans (
   symbol_id TEXT NOT NULL,
   direction TEXT NOT NULL DEFAULT 'long', -- long/short（先保留）
   status TEXT NOT NULL DEFAULT 'draft',
+  is_archived INTEGER NOT NULL DEFAULT 0,
 
   -- 买入理由
   buy_reason_types TEXT NOT NULL, -- JSON string: ["trend","policy",...]
@@ -66,6 +96,8 @@ CREATE TABLE IF NOT EXISTS trade_plans (
 
 CREATE INDEX IF NOT EXISTS idx_plans_user_status ON trade_plans(user_id, status);
 CREATE INDEX IF NOT EXISTS idx_plans_symbol ON trade_plans(symbol_id);
+CREATE INDEX IF NOT EXISTS idx_plans_user_archived_updated ON trade_plans(user_id, is_archived, updated_at);
+
 
 -- 计划修订记录：armed 后任何变更都记录
 CREATE TABLE IF NOT EXISTS plan_edits (
@@ -109,3 +141,26 @@ CREATE TABLE IF NOT EXISTS trade_results (
 );
 
 CREATE INDEX IF NOT EXISTS idx_results_user_closed ON trade_results(user_id, closed_at);
+
+-- 交易多维度自我评估（Step 7）
+CREATE TABLE IF NOT EXISTS trade_self_reviews (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL,
+  plan_id TEXT NOT NULL,
+  result_id TEXT NOT NULL,
+
+  -- 13 个维度 (1/2/3)
+  d1 INTEGER NOT NULL, d2 INTEGER NOT NULL, d3 INTEGER NOT NULL, d4 INTEGER NOT NULL,
+  h1 INTEGER NOT NULL, h2 INTEGER NOT NULL, h3 INTEGER NOT NULL, h4 INTEGER NOT NULL,
+  e1 INTEGER NOT NULL, e2 INTEGER NOT NULL, e3 INTEGER NOT NULL,
+  r1 INTEGER NOT NULL, r2 INTEGER NOT NULL,
+
+  schema_version INTEGER NOT NULL DEFAULT 1,
+  created_at INTEGER NOT NULL,
+
+  UNIQUE(user_id, plan_id),
+  FOREIGN KEY (plan_id) REFERENCES trade_plans(id) ON DELETE CASCADE,
+  FOREIGN KEY (result_id) REFERENCES trade_results(plan_id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_self_reviews_plan ON trade_self_reviews(plan_id);

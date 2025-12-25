@@ -10,6 +10,8 @@ import './widgets/events_timeline_card.dart';
 import './widgets/add_event_sheet.dart';
 import './widgets/result_card.dart';
 import './widgets/close_trade_sheet.dart';
+import './self_assessment_page.dart';
+import '../../models/self_review.dart';
 
 class PlanDetailPage extends ConsumerStatefulWidget {
   final String planId;
@@ -209,6 +211,48 @@ class _PlanDetailPageState extends ConsumerState<PlanDetailPage> {
     }
   }
 
+  Future<void> _goToSelfAssessment() async {
+    if (_data == null) return;
+
+    // Check if already has a review
+    final apiClient = ref.read(apiClientProvider);
+    try {
+      final reviewJson = await apiClient.getSelfReview(widget.planId);
+
+      if (!mounted) return;
+
+      if (reviewJson != null) {
+        final review = SelfReview.fromJson(reviewJson);
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => SelfAssessmentPage(
+              planId: widget.planId,
+              isReadOnly: true,
+              initialScores: review.scores,
+            ),
+          ),
+        );
+      } else {
+        final result = await Navigator.push<bool>(
+          context,
+          MaterialPageRoute(
+            builder: (context) =>
+                SelfAssessmentPage(planId: widget.planId, isReadOnly: false),
+          ),
+        );
+        if (result == true) {
+          _fetchDetail();
+        }
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('获取评估失败: $e')));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
@@ -246,7 +290,31 @@ class _PlanDetailPageState extends ConsumerState<PlanDetailPage> {
             if (_data!.result != null) ...[
               ResultCard(result: _data!.result!),
               const SizedBox(height: 16),
-            ] else if (_data!.plan.status != 'closed') ...[
+            ],
+            if (_data!.plan.status == 'closed') ...[
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: _goToSelfAssessment,
+                  icon: const Icon(Icons.assignment_outlined),
+                  label: const Text(
+                    '自我评估 (13维)',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    padding: const EdgeInsets.all(16),
+                    backgroundColor: Theme.of(
+                      context,
+                    ).colorScheme.primaryContainer,
+                    foregroundColor: Theme.of(
+                      context,
+                    ).colorScheme.onPrimaryContainer,
+                    elevation: 1,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+            ] else ...[
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton.icon(

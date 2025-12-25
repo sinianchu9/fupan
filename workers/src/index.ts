@@ -3,10 +3,57 @@ export interface Env {
   APP_VERSION: string;
   FREE_LIMIT: string;
   PRO_LIMIT: string;
+  JWT_ISSUER: string;
+  JWT_AUDIENCE: string;
+  JWT_SECRET: string;
 }
 
 type Json = Record<string, any>;
 
+import { signJwtHS256, verifyJwtHS256, hashOtp } from "./auth_utils";
+
+function nowEpoch() {
+  return Math.floor(Date.now() / 1000);
+}
+
+class HttpError extends Error {
+  status: number;
+  constructor(status: number, message: string) {
+    super(message);
+    this.status = status;
+  }
+}
+
+async function requireAuth(req: Request, env: Env): Promise<{ userId: string; sessionId: string }> {
+  const auth = req.headers.get("Authorization");
+  if (!auth || !auth.startsWith("Bearer ")) {
+    throw new HttpError(401, "Missing or invalid Authorization header");
+  }
+
+  const token = auth.substring(7);
+  const payload = await verifyJwtHS256(token, env.JWT_SECRET, env.JWT_ISSUER, env.JWT_AUDIENCE);
+
+  if (!payload || !payload.sub || !payload.sid) {
+    throw new HttpError(401, "Invalid or expired token");
+  }
+
+  const session = await env.DB.prepare(
+    "SELECT id, revoked FROM user_sessions WHERE id = ? AND user_id = ?"
+  ).bind(payload.sid, payload.sub).first();
+
+  if (!session || (session as any).revoked) {
+    throw new HttpError(401, "Session revoked or not found");
+  }
+
+  await env.DB.prepare(
+    "UPDATE user_sessions SET last_seen_at = ? WHERE id = ?"
+  ).bind(Math.floor(Date.now() / 1000), payload.sid).run();
+
+  return { userId: payload.sub, sessionId: payload.sid };
+}
+
+
+//xinjia
 function json(data: any, init: ResponseInit = {}) {
   return new Response(JSON.stringify(data), {
     ...init,
@@ -25,15 +72,14 @@ function ok(data: any = {}) {
   return json({ ok: true, ...data });
 }
 
-function getUserId(req: Request): string | null {
-  // MVP：前端必须传；后续可接 JWT / session
-  const id = req.headers.get("X-User-Id");
-  return id && id.trim() ? id.trim() : null;
-}
+// getUserId removed in favor of requireAuth
+
 
 function uuid(): string {
   return crypto.randomUUID();
 }
+//新加鉴权
+
 
 async function readJson(req: Request): Promise<any> {
   try {
@@ -87,9 +133,7 @@ async function getPlan(env: Env, userId: string, planId: string) {
   return plan as any;
 }
 
-function nowEpoch(): number {
-  return Math.floor(Date.now() / 1000);
-}
+
 
 // 系统判定（MVP 版本：只评“一致性”，不评涨跌对错）
 function judge(plan: any, sellReason: string): { judgement: string; conclusion: string } {
@@ -120,11 +164,96 @@ async function route(req: Request, env: Env): Promise<Response> {
   // 健康检查
   if (path === "/health") return ok({ version: env.APP_VERSION });
 
-  // 所有业务接口都需要 userId
-  const userId = getUserId(req);
-  if (!userId) return bad("Missing X-User-Id", 401);
+  // ---- Auth Routes ----
+  if (method === "POST" && path === "/auth/request-otp") {
+    const body = await readJson(req);
+    const email = body?.email;
+    if (!email || !email.includes("@")) return bad("Invalid email");
+
+    const code = Math.floor(100000 + Math.random() * 900000).toString();
+    console.log(`[OTP] ${email}: ${code}`); // In dev, we can see it in logs
+
+    const hash = await hashOtp(code);
+    const expiresAt = Math.floor(Date.now() / 1000) + 600; // 10 mins
+
+    await env.DB.prepare(
+      "INSERT INTO login_otps (id, email, code_hash, expires_at, attempts, created_at) VALUES (?, ?, ?, ?, ?, ?)"
+    ).bind(uuid(), email, hash, expiresAt, 0, Math.floor(Date.now() / 1000)).run();
+
+    return ok();
+  }
+
+  if (method === "POST" && path === "/auth/verify-otp") {
+    const body = await readJson(req);
+    const { email, code } = body || {};
+    if (!email || !code) return bad("Email and code required");
+
+    const otp = await env.DB.prepare(
+      "SELECT * FROM login_otps WHERE email = ? AND expires_at > ? AND attempts < 5 ORDER BY created_at DESC LIMIT 1"
+    ).bind(email, Math.floor(Date.now() / 1000)).first();
+
+    if (!otp) return bad("Invalid or expired OTP", 401);
+
+    const hash = await hashOtp(code);
+    if ((otp as any).code_hash !== hash) {
+      await env.DB.prepare("UPDATE login_otps SET attempts = attempts + 1 WHERE id = ?")
+        .bind((otp as any).id).run();
+      return bad("Invalid OTP", 401);
+    }
+
+    // Success! Find or create user
+    let user = await env.DB.prepare("SELECT id, email FROM app_users WHERE email = ?")
+      .bind(email).first();
+    
+    let userId: string;
+    if (!user) {
+      userId = uuid();
+      await env.DB.prepare("INSERT INTO app_users (id, email, created_at) VALUES (?, ?, ?)")
+        .bind(userId, email, Math.floor(Date.now() / 1000)).run();
+    } else {
+      userId = (user as any).id;
+    }
+
+    // Create session
+    const sessionId = uuid();
+    await env.DB.prepare(
+      "INSERT INTO user_sessions (id, user_id, revoked, created_at, last_seen_at) VALUES (?, ?, 0, ?, ?)"
+    ).bind(sessionId, userId, Math.floor(Date.now() / 1000), Math.floor(Date.now() / 1000)).run();
+
+    // Update last login
+    await env.DB.prepare("UPDATE app_users SET last_login_at = ? WHERE id = ?")
+      .bind(Math.floor(Date.now() / 1000), userId).run();
+
+    // Sign JWT
+    const token = await signJwtHS256({
+      sub: userId,
+      sid: sessionId,
+      iss: env.JWT_ISSUER,
+      aud: env.JWT_AUDIENCE,
+      iat: Math.floor(Date.now() / 1000),
+      exp: Math.floor(Date.now() / 1000) + (30 * 24 * 60 * 60) // 30 days
+    }, env.JWT_SECRET);
+
+    return ok({
+      token,
+      user: { id: userId, email }
+    });
+  }
+
+  // ---- Business Routes (Require Auth) ----
+  let userId: string;
+  try {
+    const auth = await requireAuth(req, env);
+    userId = auth.userId;
+  } catch (e) {
+    if (e instanceof HttpError) {
+      return bad(e.message, e.status);
+    }
+    return bad("Authentication failed", 401);
+  }
 
   const user = await ensureUser(env, userId);
+
 
   // ---- symbols ----
   // GET /symbols?q=  用于用户搜索选择股票
@@ -211,14 +340,13 @@ async function route(req: Request, env: Env): Promise<Response> {
     const status = (url.searchParams.get("status") || "").trim();
     const rows = await env.DB.prepare(
       `SELECT p.id, p.status, p.direction, p.buy_reason_text,
-              p.target_low, p.target_high, p.created_at, p.updated_at,p.is_archived,
+              p.target_low, p.target_high, p.created_at, p.updated_at, p.is_archived,
               s.code as symbol_code, s.name as symbol_name, s.industry as symbol_industry
        FROM trade_plans p
-       JOIN symbols s ON s.id=p.symbol_id
-       WHERE p.user_id=?
-	AND p.is_archived=0
-	AND (?='' OR p.status=?)
-
+       JOIN symbols s ON s.id = p.symbol_id
+       WHERE p.user_id = ?
+       AND p.is_archived = 0
+       AND (? = '' OR p.status = ?)
        ORDER BY p.updated_at DESC
        LIMIT 200`
     ).bind(userId, status, status).all();
@@ -263,12 +391,11 @@ if (method === "GET" && path === "/plans/archived") {
   const status = (url.searchParams.get("status") || "").trim();
   const rows = await env.DB.prepare(
     `SELECT p.id, p.status, p.direction, p.buy_reason_text,
-            p.target_low, p.target_high, p.created_at, p.updated_at,
-            p.is_archived,
+            p.target_low, p.target_high, p.created_at, p.updated_at, p.is_archived,
             s.code as symbol_code, s.name as symbol_name, s.industry as symbol_industry
      FROM trade_plans p
-     JOIN symbols s ON s.id=p.symbol_id
-     WHERE p.user_id=? AND p.is_archived=1 AND (?='' OR p.status=?)
+     JOIN symbols s ON s.id = p.symbol_id
+     WHERE p.user_id = ? AND p.is_archived = 1 AND (? = '' OR p.status = ?)
      ORDER BY p.updated_at DESC
      LIMIT 200`
   ).bind(userId, status, status).all();
@@ -396,6 +523,7 @@ if (method === "GET" && path === "/plans/archived") {
     const planId = parts[2];
     const plan = await getPlan(env, userId, planId);
     if (!plan) return bad("not found", 404);
+    if (String(plan.status) === "closed") return bad("closed plan is read-only", 409);
 
     const body = await readJson(req);
     if (!body) return bad("json body required");
@@ -463,35 +591,53 @@ if (method === "GET" && path === "/plans/archived") {
     return ok();
   }
 
-  // POST /plans/:id/add-event
-  if (method === "POST" && path.startsWith("/plans/") && path.endsWith("/add-event")) {
-    const planId = path.split("/")[2];
-    const plan = await getPlan(env, userId, planId);
-    if (!plan) return bad("not found", 404);
+ // POST /plans/:id/add-event
+if (method === "POST" && path.startsWith("/plans/") && path.endsWith("/add-event")) {
+  const planId = path.split("/")[2];
+  const plan = await getPlan(env, userId, planId);
+  if (!plan) return bad("not found", 404);
 
-    const body = await readJson(req);
-    const { event_type, summary, impact_target, triggered_exit } = body || {};
-    if (!event_type || !summary || !impact_target) return bad("event_type/summary/impact_target required");
+  // ✅ 关键：closed 后端只读冻结
+  if (String(plan.status) === "closed") return bad("closed plan is read-only", 409);
 
-    // 只允许 4 类
-    const allowedTypes = new Set(["falsify", "forced", "verify", "structure"]);
-    if (!allowedTypes.has(String(event_type))) return bad("invalid event_type");
+  const body = await readJson(req);
+  const { event_type, summary, impact_target, triggered_exit } = body || {};
 
-    const id = uuid();
-    await env.DB.prepare(
-      `INSERT INTO trade_events (id, plan_id, user_id, event_type, summary, impact_target, triggered_exit)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`
-    )
-      .bind(
-        id, planId, userId,
-        String(event_type), String(summary).slice(0, 80),
-        String(impact_target),
-        triggered_exit ? 1 : 0
-      )
-      .run();
-
-    return ok({ id });
+  // ✅ triggered_exit 必填（必须明确回答：是否触发退出条件）
+  if (triggered_exit === undefined || triggered_exit === null) {
+    return bad("triggered_exit required");
   }
+
+  if (!event_type || !summary || !impact_target) return bad("event_type/summary/impact_target required");
+
+  // 只允许 4 类
+  const allowedTypes = new Set(["falsify", "forced", "verify", "structure"]);
+  if (!allowedTypes.has(String(event_type))) return bad("invalid event_type");
+
+  // impact_target 白名单（建议加上，防脏数据）
+  const allowedTargets = new Set(["buy_logic", "sell_logic", "stop_loss"]);
+  if (!allowedTargets.has(String(impact_target))) return bad("invalid impact_target");
+
+  const id = uuid();
+  const summaryText = String(summary).trim();
+  if (!summaryText) return bad("summary required");
+
+  await env.DB.prepare(
+    `INSERT INTO trade_events (id, plan_id, user_id, event_type, summary, impact_target, triggered_exit)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`
+  )
+    .bind(
+      id, planId, userId,
+      String(event_type),
+      summaryText.slice(0, 40), // ✅ 与前端统一：40
+      String(impact_target),
+      triggered_exit ? 1 : 0
+    )
+    .run();
+
+  return ok({ id });
+}
+
 
   // POST /plans/:id/close  {sell_price, sell_reason}
   if (method === "POST" && path.startsWith("/plans/") && path.endsWith("/close")) {
@@ -523,48 +669,222 @@ if (method === "GET" && path === "/plans/archived") {
     return ok({ system_judgement: judgement, conclusion_text: conclusion });
   }
 
+  // ---- self reviews (Step 7) ----
+  // POST /reviews/self
+  if (method === "POST" && path === "/reviews/self") {
+    const body = await readJson(req);
+    if (!body) return bad("json body required");
+
+    const { plan_id } = body;
+    if (!plan_id) return bad("plan_id required");
+
+    // 1. Strict Validation: Ownership and Status
+    const plan = await getPlan(env, userId, plan_id);
+    if (!plan) return bad("plan not found", 404);
+    if (plan.status !== "closed") {
+      return bad("only closed plans can be self-reviewed", 403);
+    }
+
+    // 2. Uniqueness: Check if already reviewed
+    const existing = await env.DB.prepare(
+      "SELECT 1 FROM trade_self_reviews WHERE user_id = ? AND plan_id = ?"
+    ).bind(userId, plan_id).first();
+    if (existing) return bad("self-review already exists for this plan", 409);
+
+    // 3. Data Validation: 13 dimensions (d1-d4, h1-h4, e1-e3, r1-r2)
+    const dimensions = ["d1", "d2", "d3", "d4", "h1", "h2", "h3", "h4", "e1", "e2", "e3", "r1", "r2"];
+    const scores: Record<string, number> = {};
+    for (const d of dimensions) {
+      const val = body[d];
+      if (val === undefined || val === null) return bad(`${d} required`);
+      const num = Number(val);
+      if (num < 1 || num > 3) return bad(`${d} must be between 1 and 3`);
+      scores[d] = num;
+    }
+
+    // 4. Persistence
+    const id = uuid();
+    const ts = nowEpoch();
+    
+    // Get result_id (which is plan_id in trade_results)
+    const result = await env.DB.prepare(
+      "SELECT plan_id FROM trade_results WHERE plan_id = ? AND user_id = ?"
+    ).bind(plan_id, userId).first();
+    if (!result) return bad("trade result not found", 404);
+
+    await env.DB.prepare(
+      `INSERT INTO trade_self_reviews (
+        id, user_id, plan_id, result_id,
+        d1, d2, d3, d4, h1, h2, h3, h4, e1, e2, e3, r1, r2,
+        schema_version, created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)`
+    ).bind(
+      id, userId, plan_id, plan_id,
+      scores.d1, scores.d2, scores.d3, scores.d4,
+      scores.h1, scores.h2, scores.h3, scores.h4,
+      scores.e1, scores.e2, scores.e3,
+      scores.r1, scores.r2,
+      ts
+    ).run();
+
+    return ok({ id });
+  }
+
+  // GET /reviews/self/:plan_id
+  if (method === "GET" && path.startsWith("/reviews/self/")) {
+    const planId = path.split("/")[3];
+    if (!planId) return bad("plan_id required");
+
+    const review = await env.DB.prepare(
+      "SELECT * FROM trade_self_reviews WHERE plan_id = ? AND user_id = ?"
+    ).bind(planId, userId).first();
+
+    return ok({ review: review || null });
+  }
+
   // ---- weekly report (MVP: PCS/TNR/LDC 的骨架先跑) ----
   // GET /report/weekly?days=7  （默认7天）
   if (method === "GET" && path === "/report/weekly") {
-    const days = Number(url.searchParams.get("days") || "7");
-    const since = nowEpoch() - Math.max(1, days) * 86400;
+    const sql = `
+      WITH params AS (
+        SELECT
+          CAST(strftime('%s', date('now','weekday 1','-7 days')) AS INTEGER) AS ws,
+          CAST(strftime('%s','now') AS INTEGER) AS we
+      ),
+      weekly_closed AS (
+        SELECT r.plan_id, r.user_id, r.sell_price, r.system_judgement, r.conclusion_text, r.closed_at
+        FROM trade_results r, params p
+        WHERE r.user_id = ?
+          AND r.closed_at >= p.ws AND r.closed_at < p.we
+      ),
+      counts AS (
+        SELECT
+          COUNT(*) AS total_closed,
+          SUM(CASE WHEN system_judgement='follow_plan' THEN 1 ELSE 0 END) AS cnt_follow,
+          SUM(CASE WHEN system_judgement='no_plan' THEN 1 ELSE 0 END) AS cnt_no_plan,
+          SUM(CASE WHEN system_judgement='emotion_override' THEN 1 ELSE 0 END) AS cnt_emotion
+        FROM weekly_closed
+      ),
+      main_dev AS (
+        SELECT
+          CASE
+            WHEN (SELECT total_closed FROM counts)=0 THEN 'no_trades'
+            WHEN (SELECT cnt_no_plan FROM counts) > 0 THEN 'no_plan'
+            WHEN (SELECT cnt_emotion FROM counts) > 0 THEN 'emotion_override'
+            ELSE
+              CASE
+                WHEN EXISTS (
+                  SELECT 1
+                  FROM trade_events e, params p
+                  WHERE e.user_id=?
+                    AND e.event_type='forced'
+                    AND e.created_at >= p.ws AND e.created_at < p.we
+                ) THEN 'forced'
+                ELSE 'none'
+              END
+          END AS main_deviation
+      ),
+      rep_conclusion AS (
+        SELECT c.conclusion_text
+        FROM weekly_closed c
+        WHERE c.system_judgement <> 'follow_plan'
+        ORDER BY c.closed_at DESC
+        LIMIT 1
+      ),
+      rep_conclusion_fallback AS (
+        SELECT c.conclusion_text
+        FROM weekly_closed c
+        ORDER BY c.closed_at DESC
+        LIMIT 1
+      ),
+      tnr AS (
+        SELECT
+          CASE
+            WHEN (SELECT total_closed FROM counts)=0 AND NOT EXISTS (
+              SELECT 1 FROM trade_events e, params p
+              WHERE e.user_id=?
+                AND e.event_type='verify'
+                AND e.impact_target='sell_logic'
+                AND e.triggered_exit=0
+                AND e.created_at >= p.ws AND e.created_at < p.we
+            ) THEN '不适用'
+            WHEN EXISTS (
+              SELECT 1 FROM trade_events e, params p
+              WHERE e.user_id=?
+                AND e.event_type='verify'
+                AND e.impact_target='sell_logic'
+                AND e.triggered_exit=0
+                AND e.created_at >= p.ws AND e.created_at < p.we
+            ) THEN '发生'
+            ELSE '未发生'
+          END AS tnr_status
+      ),
+      ldc_calc AS (
+        SELECT
+          SUM(
+            CASE
+              WHEN p.stop_value IS NULL THEN 0
+              WHEN p.direction='long'  AND wc.sell_price < p.stop_value THEN (p.stop_value - wc.sell_price)
+              WHEN p.direction='short' AND wc.sell_price > p.stop_value THEN (wc.sell_price - p.stop_value)
+              ELSE 0
+            END
+          ) AS ldc_value,
+          SUM(
+            CASE
+              WHEN p.stop_value IS NULL THEN 0
+              WHEN EXISTS (
+                SELECT 1 FROM trade_events e
+                WHERE e.plan_id = wc.plan_id
+                  AND e.user_id=?
+                  AND e.impact_target='stop_loss'
+                  AND e.triggered_exit=0
+              ) THEN 1
+              ELSE 0
+            END
+          ) AS ldc_evidence_count
+        FROM weekly_closed wc
+        JOIN trade_plans p ON p.id = wc.plan_id AND p.user_id = ?
+      ),
+      ldc AS (
+        SELECT
+          CASE
+            WHEN (SELECT total_closed FROM counts)=0 THEN '不适用'
+            WHEN (SELECT ldc_evidence_count FROM ldc_calc) > 0 THEN '发生'
+            ELSE '未发生'
+          END AS ldc_status,
+          CASE
+            WHEN (SELECT ldc_evidence_count FROM ldc_calc) > 0 THEN (SELECT ldc_value FROM ldc_calc)
+            ELSE NULL
+          END AS ldc_value
+      )
+      SELECT
+        (SELECT total_closed FROM counts) AS total_closed,
+        CASE
+          WHEN (SELECT total_closed FROM counts)=0 THEN NULL
+          ELSE ROUND( (CAST((SELECT cnt_follow FROM counts) AS REAL) / (SELECT total_closed FROM counts)) * 100, 0)
+        END AS pcs,
+        (SELECT main_deviation FROM main_dev) AS main_deviation,
+        COALESCE((SELECT conclusion_text FROM rep_conclusion),
+                 (SELECT conclusion_text FROM rep_conclusion_fallback)) AS conclusion_text,
+        (SELECT tnr_status FROM tnr) AS tnr_status,
+        (SELECT ldc_status FROM ldc) AS ldc_status,
+        (SELECT ldc_value FROM ldc) AS ldc_value
+    `;
 
-    // PCS：按计划执行占比（简化版：follow_plan / 总 closed）
-    const totalClosedRow = await env.DB.prepare(
-      `SELECT COUNT(*) as c FROM trade_results WHERE user_id=? AND closed_at>=?`
-    ).bind(userId, since).first();
-    const followRow = await env.DB.prepare(
-      `SELECT COUNT(*) as c FROM trade_results WHERE user_id=? AND closed_at>=? AND system_judgement='follow_plan'`
-    ).bind(userId, since).first();
+    const row = await env.DB.prepare(sql)
+      .bind(userId, userId, userId, userId, userId, userId)
+      .first();
 
-    const total = Number((totalClosedRow as any)?.c || 0);
-    const follow = Number((followRow as any)?.c || 0);
-    const pcs = total === 0 ? 0 : Math.round((follow / total) * 100);
-
-    // TNR/LDC：需要“触达目标区后未卖/该止损未止”依赖行情与实时触发记录
-    // MVP 先返回 null，前端显示 “待启用（需要行情对照）”
-    const tnr = null;
-    const ldc = null;
-
-    // 本周主要偏离类型
-    const top = await env.DB.prepare(
-      `SELECT system_judgement as k, COUNT(*) as c
-       FROM trade_results
-       WHERE user_id=? AND closed_at>=?
-       GROUP BY system_judgement
-       ORDER BY c DESC
-       LIMIT 1`
-    ).bind(userId, since).first();
-
-    const mainDeviation = top ? (top as any).k : null;
+    if (!row) return bad("Failed to calculate report");
 
     return ok({
-      days,
-      pcs,
-      tnr,
-      ldc,
-      main_deviation: mainDeviation,
-      note: "TNR/LDC 需要行情对照与触发记录，MVP 先占位。",
+      has_trades: Number((row as any).total_closed || 0) > 0,
+      pcs: (row as any).pcs,
+      main_deviation: (row as any).main_deviation,
+      conclusion_text: (row as any).conclusion_text,
+      tnr_status: (row as any).tnr_status,
+      ldc_status: (row as any).ldc_status,
+      ldc_value: (row as any).ldc_value
     });
   }
 
@@ -572,7 +892,7 @@ if (method === "GET" && path === "/plans/archived") {
 }
 
 export default {
-  fetch(req: Request, env: Env) {
+  async fetch(req: Request, env: Env) {
     // CORS（简单粗暴，够用）
     if (req.method === "OPTIONS") {
       return new Response(null, {
@@ -580,15 +900,25 @@ export default {
         headers: {
           "access-control-allow-origin": "*",
           "access-control-allow-methods": "GET,POST,OPTIONS",
-          "access-control-allow-headers": "content-type, X-User-Id",
+          "access-control-allow-headers": "content-type, Authorization",
         },
       });
     }
 
-    return route(req, env).then((res) => {
+    try {
+      const res = await route(req, env);
       const h = new Headers(res.headers);
       h.set("access-control-allow-origin", "*");
       return new Response(res.body, { status: res.status, headers: h });
-    });
+    } catch (e: any) {
+      console.error(e);
+      return new Response(JSON.stringify({ ok: false, error: e.message || String(e) }), {
+        status: 500,
+        headers: {
+          "content-type": "application/json; charset=utf-8",
+          "access-control-allow-origin": "*",
+        },
+      });
+    }
   },
 };

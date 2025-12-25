@@ -1,163 +1,195 @@
-参考 一 二 完成 三  四
-***** 一、D1：增加归档字段（最小 schema patch）
+实现页面：SelfAssessmentPage（用于 closed 交易的 13 维自评）
 
+目标：
+- 13 项必须全填
+- 每项用 1/2/3 分段选择器
+- 默认只显示“选中分数对应的一行锚点短句”
+- 点击“查看细则”才展开 1/2/3 全文（默认收起）
+- 若已提交则只读展示（不可编辑）
 
+UI 结构（建议）：
+- AppBar：自我评估
+- 顶部：完成度提示 “已完成 x/13”
+- ListView：
+  - 按 4 个阶段分组（Section Header）
+  - 每个维度用一个 Card/ListTile
+    * 标题：如 “R1 主要问题定位准确性”
+    * 右侧：1/2/3 Segmented（CupertinoSegmentedControl 或自建三按钮）
+    * 下方：锚点短句（随选择变化）
+    * 右下：小按钮/折叠 “查看细则” → 展开显示 1/2/3 三条完整描述
+- 底部固定按钮：
+  - “提交”（disabled 直到 13 项全选）
+  - 点击提交：POST /reviews/self
+  - 成功后：进入只读态（或 pop 并刷新详情页）
 
-ALTER TABLE trade_plans ADD COLUMN is_archived INTEGER NOT NULL DEFAULT 0;
-CREATE INDEX IF NOT EXISTS idx_plans_user_archived_updated
-ON trade_plans(user_id, is_archived, updated_at);
+交互规则：
+- 未选择的项：Card 边框轻微高亮（提示必须完成）
+- 不显示总分/均分
+- 不显示“高/中/低”，只显示数字与锚点文案
+- 文案不出现建议、评判、鸡汤
 
+数据结构建议：
+enum Score { s1, s2, s3 }
+class DimensionDef { key, title, short1, short2, short3, full1, full2, full3, stage }
+将 13 个维度做成静态列表，渲染时循环。
 
-注意：SQLite 的 ALTER TABLE ADD COLUMN 安全；老数据默认 is_archived=0。
+只读态：
+- Segmented disabled
+- 展开/收起仍可用
+- 显示已选分数 + 锚点短句
+13 个维度：1/2/3 细则（可直接放进代码）
 
-******二、Workers：实现“归档”接口 + 列表默认隐藏归档
-1）修改 GET /plans：默认只返回未归档
+格式：
+短句用于默认展示（随选择变化，1 行）
+细则用于“查看细则”展开（仍然简短）
 
-把现有 /plans 查询从：
+阶段一：买入前（Decision Quality）
 
-WHERE p.user_id=? AND (?='' OR p.status=?)
+D1 买入逻辑清晰度
 
+1 短句：说不清，只剩感觉/价格
+细则：只能复述“涨了/跌了/想抄底/感觉要起”，无条件描述
 
-改成：
+2 短句：有原因，但逻辑松散
+细则：有关键词（题材/指标/消息），但触发条件不明确
 
-WHERE p.user_id=?
-  AND p.is_archived=0
-  AND (?='' OR p.status=?)
+3 短句：一句话可复述，条件明确
+细则：能说出“在什么条件下买/为什么买/触发点是什么”
 
+D2 预期与失效边界
 
-同时 SELECT 最好带上 p.is_archived（方便前端显示/调试）：
+1 短句：无目标，也无失效条件
+细则：没有明确目标位或止损位（或写了但不可执行）
 
-SELECT p.id, p.status, p.direction, p.buy_reason_text,
-       p.target_low, p.target_high, p.created_at, p.updated_at,
-       p.is_archived,
-       s.code as symbol_code, s.name as symbol_name, s.industry as symbol_industry
-...
+2 短句：只有目标或只有止损
+细则：二者缺其一，导致无法判定何时退出
 
-2）新增 GET /plans/archived
+3 短句：目标与失效条件都清晰
+细则：目标与止损/失效条件同时存在且可执行
 
-用于“已归档列表”页面，不污染主列表逻辑。
+D3 环境一致性认知
 
-// GET /plans/archived?status=
-if (method === "GET" && path === "/plans/archived") {
-  const status = (url.searchParams.get("status") || "").trim();
-  const rows = await env.DB.prepare(
-    `SELECT p.id, p.status, p.direction, p.buy_reason_text,
-            p.target_low, p.target_high, p.created_at, p.updated_at,
-            p.is_archived,
-            s.code as symbol_code, s.name as symbol_name, s.industry as symbol_industry
-     FROM trade_plans p
-     JOIN symbols s ON s.id=p.symbol_id
-     WHERE p.user_id=? AND p.is_archived=1 AND (?='' OR p.status=?)
-     ORDER BY p.updated_at DESC
-     LIMIT 200`
-  ).bind(userId, status, status).all();
+1 短句：没考虑大盘/行业/节奏
+细则：完全未提及环境因素或风险背景
 
-  return ok({ items: rows.results || [] });
-}
+2 短句：知道不一致，但仍介入
+细则：承认逆风/逆势，但没有对应的仓位/退出安排
 
-3）新增 POST /plans/:id/archive 和 /plans/:id/unarchive
+3 短句：匹配环境，或清楚自知逆势
+细则：说明环境匹配逻辑；若逆势，明确“我在赌什么 + 退路”
 
-规则建议（保持严肃性）：
+D4 买入时情绪状态
 
-draft/armed/holding/closed 都允许归档（归档只是“从主视图移走”，不是删除）
+1 短句：焦虑/FOMO/报复性驱动
+细则：怕错过、怕踏空、想翻本、情绪推动下单
 
-归档后仍能从 archived 列表查看详情（只读为主）
+2 短句：有波动，但仍可控
+细则：紧张但能延迟下单或按流程检查
 
-插入到你路由里（靠近 plans 区域即可）：
+3 短句：冷静，可延迟决策
+细则：不急于成交，能等待条件确认
 
-// POST /plans/:id/archive
-if (method === "POST" && path.startsWith("/plans/") && path.endsWith("/archive")) {
-  const planId = path.split("/")[2];
-  if (!planId) return bad("plan id required");
+阶段二：持仓中（Execution & Emotion）
 
-  const plan = await getPlan(env, userId, planId);
-  if (!plan) return bad("not found", 404);
+H1 是否按原计划持有
 
-  const ts = nowEpoch();
-  await env.DB.prepare(
-    `UPDATE trade_plans SET is_archived=1, updated_at=? WHERE id=? AND user_id=?`
-  ).bind(ts, planId, userId).run();
+1 短句：频繁改计划/临时加减仓
+细则：多次修改条件、随意加仓摊平、随意减仓止痒
 
-  return ok();
-}
+2 短句：小幅调整，但不改核心逻辑
+细则：调整细节（如分批），但仍围绕原触发条件
 
-// POST /plans/:id/unarchive
-if (method === "POST" && path.startsWith("/plans/") && path.endsWith("/unarchive")) {
-  const planId = path.split("/")[2];
-  if (!planId) return bad("plan id required");
+3 短句：严格按原计划执行
+细则：持仓动作与原计划一致，无临时改口
 
-  const plan = await getPlan(env, userId, planId);
-  if (!plan) return bad("not found", 404);
+H2 情绪波动强度
 
-  const ts = nowEpoch();
-  await env.DB.prepare(
-    `UPDATE trade_plans SET is_archived=0, updated_at=? WHERE id=? AND user_id=?`
-  ).bind(ts, planId, userId).run();
+1 短句：高频盯盘/明显焦虑
+细则：频繁刷新、坐立不安，决策受波动影响
 
-  return ok();
-}
+2 短句：偶尔波动
+细则：会紧张，但能恢复到计划框架
 
-4）详情接口 GET /plans/:id：建议返回 plan.is_archived
+3 短句：情绪稳定
+细则：能把波动当噪音，不改变动作
 
-你 getPlan() 当前 SELECT p.*，只要加了列就会自动带上；前端可用它决定显示“取消归档”按钮。
-****************************完成以下任务*********************************
-三、Flutter：主列表加“归档入口”，并做一个“已归档”页
-1）ApiClient 增加方法（最少 3 个）
+H3 信息依赖与验证行为
 
-getPlans()：保持不变（主列表默认未归档）
+1 短句：刷消息为自己辩护
+细则：不断找利好/观点来证明自己对
 
-getArchivedPlans()：调用 /plans/archived
+2 短句：被动接收信息
+细则：看信息但不形成行动依据
 
-archivePlan(planId)：POST /plans/:id/archive
+3 短句：主动屏蔽噪音
+细则：只看与计划条件直接相关的信息
 
-unarchivePlan(planId)：POST /plans/:id/unarchive
+H4 纪律破坏点（没发生也要评 3）
 
-你现在已经有 plans list，照现有风格加即可。
+1 短句：破坏纪律且没记录原因
+细则：发生加仓/扛单/提前卖等行为，但无记录
 
-2）列表 UI：每张卡加 “⋯” 菜单 → 归档
+2 短句：破坏纪律但能说明原因
+细则：承认破坏点，并写清触发原因
 
-推荐交互：长按卡片或右上角 PopupMenuButton：
+3 短句：无纪律破坏
+细则：无破戒动作，或有冲动但未执行且有记录
 
-归档（主列表）
+阶段三：卖出当下（Exit Discipline）
 
-查看详情
+E1 卖出动机匹配度
 
-（已结束的卡也允许归档）
+1 短句：恐慌/贪婪/外界刺激
+细则：因为情绪或他人观点触发卖出
 
-归档成功后：
+2 短句：部分符合原逻辑
+细则：有一部分条件吻合，但执行点偏离
 
-直接从列表移除（本地删掉这条，或触发 refresh）
+3 短句：完全按预设条件卖出
+细则：卖出触发点与原计划一致
 
-弹 snackbar：“已归档，可在已归档中查看”
+E2 执行果断性
 
-3）添加一个“已归档”入口
+1 短句：反复修改/犹豫拖延
+细则：改来改去、拖到错过条件
 
-位置选择（最少改动）：
+2 短句：短暂犹豫后执行
+细则：犹豫但没有改动核心决策
 
-复盘列表页 AppBar 右上角菜单：已归档
+3 短句：一次性执行
+细则：触发即执行，不反复试探
 
-进入 ArchivedPlansPage（结构复用 JournalListPage，只是数据源不同）
+E3 卖出后的即时心理反应
 
-ArchivedPlansPage 的每条卡菜单：
+1 短句：后悔/想立刻追回
+细则：强烈不甘、立刻想再进场
 
-取消归档（unarchive）
+2 短句：波动但可接受
+细则：有情绪，但不会驱动下一笔冲动交易
 
-查看详情
+3 短句：平静接受结果
+细则：能接受结果，不急于证明自己
 
-四、计划完成后隐藏“添加事件”卡片（强制）
+阶段四：事后复盘（Learning Quality）
 
+R1 主要问题定位准确性
 
-在 PlanDetailPage 里加一个统一判断：
+1 短句：泛泛而谈/归因模糊
+细则：只写“心态不好/不够理性/运气差”，无具体行为
 
-final isClosed = detail.result != null || detail.plan.status == 'closed';
+2 短句：能定位阶段，但不具体
+细则：能说“买入/持仓/卖出有问题”，但说不出具体动作
 
+3 短句：定位到阶段 + 具体行为
+细则：明确“哪个阶段 + 哪个动作/决策”导致偏离
 
-然后：
+R2 可执行改进点
 
-“新增事件”按钮：if (!isClosed) ...
+1 短句：抽象口号，不可执行
+细则：如“更谨慎/更理性/少冲动”
 
-AddEventSheet：if (!isClosed) showModalBottomSheet(...)
+2 短句：方向对，但不够操作化
+细则：如“少看盘”，但没给可验证规则
 
-事件列表：仍显示（只读）
-
-修订按钮：我也建议 !isClosed 才显示（结束后不该再修订）
+3 短句：具体、可验证、可复用
+细则：给出明确规则（条件/频率/触发）且下次可直接照做

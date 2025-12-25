@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../journal/journal_list_page.dart';
 import '../onboarding/onboarding_watchlist_page.dart';
+import '../stats/weekly_report_page.dart';
 
 class MainShell extends StatefulWidget {
   const MainShell({super.key});
@@ -15,7 +16,7 @@ class _MainShellState extends State<MainShell> {
   final List<Widget> _pages = [
     const JournalListPage(),
     const Center(child: Text('异动 (Step 4 实现)')),
-    const Center(child: Text('统计 (Step 5 实现)')),
+    const WeeklyReportPage(),
   ];
 
   @override
