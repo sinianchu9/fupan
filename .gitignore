@@ -37,3 +37,6 @@ Runner.xcworkspace/xcuserdata/
 .idea/
 .DS_Store
 *.log
+.wrangler/
+*.sqlite*
+*.log
