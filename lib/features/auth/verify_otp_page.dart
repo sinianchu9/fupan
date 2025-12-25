@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:fupan/l10n/generated/app_localizations.dart';
 import '../../core/providers.dart';
 import '../shell/main_shell.dart';
 
@@ -16,11 +17,12 @@ class _VerifyOtpPageState extends ConsumerState<VerifyOtpPage> {
   bool _isLoading = false;
 
   Future<void> _verifyOtp() async {
+    final l10n = AppLocalizations.of(context)!;
     final code = _codeController.text.trim();
     if (code.length != 6) {
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(const SnackBar(content: Text('请输入6位验证码')));
+      ).showSnackBar(SnackBar(content: Text(l10n.tip_invalid_otp)));
       return;
     }
 
@@ -46,62 +48,65 @@ class _VerifyOtpPageState extends ConsumerState<VerifyOtpPage> {
       if (mounted) {
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(const SnackBar(content: Text('验证码错误或已过期')));
+        ).showSnackBar(SnackBar(content: Text(l10n.tip_verify_failed)));
       }
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Scaffold(
-      appBar: AppBar(title: const Text('验证')),
-      body: Padding(
-        padding: const EdgeInsets.all(24.0),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            const Text(
-              '验证码已发送至',
-              textAlign: TextAlign.center,
-              style: TextStyle(color: Colors.grey),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              widget.email,
-              textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 32),
-            TextField(
-              controller: _codeController,
-              decoration: const InputDecoration(
-                labelText: '6位验证码',
-                border: OutlineInputBorder(),
-                prefixIcon: Icon(Icons.lock_outline),
+      appBar: AppBar(title: Text(l10n.title_verify_otp)),
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: EdgeInsets.only(
+            left: 24,
+            right: 24,
+            top: 24,
+            bottom: MediaQuery.of(context).viewInsets.bottom + 24,
+          ),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const SizedBox(height: 40),
+              Text(
+                l10n.tip_otp_sent_to(widget.email),
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: Colors.grey),
               ),
-              keyboardType: TextInputType.number,
-              maxLength: 6,
-            ),
-            const SizedBox(height: 24),
-            ElevatedButton(
-              onPressed: _isLoading ? null : _verifyOtp,
-              style: ElevatedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 16),
+              const SizedBox(height: 32),
+              TextField(
+                controller: _codeController,
+                decoration: InputDecoration(
+                  labelText: l10n.label_otp,
+                  border: const OutlineInputBorder(),
+                  prefixIcon: const Icon(Icons.lock_outline),
+                ),
+                keyboardType: TextInputType.number,
+                maxLength: 6,
               ),
-              child: _isLoading
-                  ? const SizedBox(
-                      height: 20,
-                      width: 20,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Text('登录'),
-            ),
-            TextButton(
-              onPressed: _isLoading ? null : () => Navigator.pop(context),
-              child: const Text('返回修改邮箱'),
-            ),
-          ],
+              const SizedBox(height: 24),
+              ElevatedButton(
+                onPressed: _isLoading ? null : _verifyOtp,
+                style: ElevatedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                ),
+                child: _isLoading
+                    ? const SizedBox(
+                        height: 20,
+                        width: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : Text(l10n.action_verify),
+              ),
+              TextButton(
+                onPressed: _isLoading ? null : () => Navigator.pop(context),
+                child: Text(l10n.action_back_to_edit_email),
+              ),
+            ],
+          ),
         ),
       ),
     );

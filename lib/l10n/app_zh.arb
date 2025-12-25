@@ -1,0 +1,218 @@
+{
+  "@@locale": "zh",
+  "title_journal": "交易复盘",
+  "title_plan_detail": "计划详情",
+  "title_self_assessment": "自我评估",
+  "title_weekly_report": "本周纪律周报",
+  "title_create_plan": "新建计划",
+  "title_archived_plans": "已归档计划",
+  "title_login": "登录",
+
+  "status_draft": "预建仓",
+  "status_armed": "已建仓",
+  "status_holding": "持仓",
+  "status_closed": "平仓",
+  "status_archived": "已归档",
+
+  "action_create_plan": "新建计划",
+  "action_submit": "提交评估",
+  "action_arm": "建仓",
+  "action_close_trade": "平仓结案",
+  "action_self_assessment": "自我评估",
+  "action_archive": "归档",
+  "action_unarchive": "取消归档",
+  "action_refresh": "刷新",
+  "action_view_detail": "查看详情",
+  "action_hide_details": "收起细则",
+  "action_back": "返回",
+  "action_confirm": "确定",
+  "action_add": "添加",
+  "action_switch_language": "切换语言",
+  "tip_required": "必填",
+
+  "label_language_zh": "简体中文",
+  "label_language_en": "English",
+
+  "label_discipline_score": "本周纪律得分",
+  "label_symbol": "标的",
+  "label_industry": "行业",
+  "label_updated_at": "更新时间",
+  "label_pcs_score": "1️⃣ 计划一致性得分 (PCS)",
+  "label_main_deviation": "2️⃣ 本周主要偏离类型",
+  "label_conclusion": "3️⃣ 冷静结论",
+  "label_tnr_ldc": "4️⃣ TNR / LDC",
+  "label_completed_count": "已完成 {count}/13",
+  "@label_completed_count": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+
+  "tip_no_plans": "还没有交易计划",
+  "tip_no_plans_sub": "先写计划再交易，强化交易纪律",
+  "tip_no_trades": "本周无交易记录",
+  "tip_fetch_failed": "获取数据失败: {error}",
+  "@tip_fetch_failed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "tip_submit_success": "评估提交成功",
+  "tip_submit_failed": "提交失败: {error}",
+  "@tip_submit_failed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "tip_complete_all": "请完成所有维度的评估",
+  "label_buy_reason": "买入理由",
+  "label_reason_type": "理由类型",
+  "label_target_range": "目标区间",
+  "label_sell_logic": "卖出逻辑",
+  "label_time_take_profit": "时间止盈",
+  "label_stop_logic": "止损逻辑",
+  "label_entry_price": "预期买入价",
+  "label_edit_history": "修订记录",
+  "label_close_price": "成交均价",
+  "label_close_reason": "平仓理由",
+  "hint_close_price": "输入平仓成交均价",
+  "hint_close_reason": "简述平仓逻辑（如：触及止盈、逻辑走坏等）",
+  "label_create": "创建",
+  "label_update": "更新",
+  "label_original_plan": "原始计划 (锁定内容)",
+  "deviation_no_plan": "无计划交易",
+  "deviation_emotion_override": "情绪覆盖计划",
+  "deviation_forced": "强制扰动",
+  "deviation_none": "无偏离",
+  "deviation_no_trades": "无交易",
+  "label_no_trades": "无交易",
+  "label_none": "无",
+  "label_not_applicable": "不适用",
+  "title_create_plan": "新建交易计划",
+  "action_save_draft": "保存草稿",
+  "label_symbol_selection": "股票选择",
+  "label_buy_reason_one_liner": "一句话理由",
+  "hint_buy_reason_one_liner": "用人话说一句 (50字以内)",
+  "label_target_sell_price": "预期卖出目标",
+  "label_target_low": "目标低位",
+  "label_target_high": "目标高位",
+  "label_sell_logic_expected": "预期卖出逻辑",
+  "label_time_take_profit_days": "时间止盈天数",
+  "label_stop_loss_logic": "止损逻辑",
+  "label_stop_price": "止损价",
+  "label_stop_days": "止损天数",
+  "label_max_loss_percent": "最大亏损 (%)",
+  "hint_max_loss": "例如 5 表示 5%",
+  "label_advanced_options": "高级选项",
+  "label_expected_entry_price": "预期买入价 (可选)",
+  "label_trade_direction": "交易方向",
+  "label_long": "做多 (Long)",
+  "label_short": "做空 (Short)",
+  "tip_select_buy_reason": "请至少选择一个买入理由类型",
+  "tip_select_sell_logic": "请至少选择一个卖出逻辑",
+  "tip_watchlist_empty": "自选股为空，请先添加股票",
+  "tip_greater_than_low": "须大于低位",
+  "tip_greater_than_zero": "须 >= 1",
+  "tip_invalid_loss_percent": "请输入 1~100",
+  "tip_invalid_price": "请输入有效的成交均价",
+  "reason_trend": "趋势",
+  "reason_range": "震荡",
+  "reason_policy": "政策",
+  "reason_industry": "行业",
+  "reason_earnings": "财报",
+  "reason_sentiment": "情绪",
+  "reason_probe": "试仓",
+  "reason_other": "其他",
+  "target_technical": "技术位",
+  "target_previous_high": "前高",
+  "target_event": "事件兑现",
+  "target_trend": "趋势延续",
+  "logic_reach_target": "到达目标区",
+  "logic_volume_exhaust": "量能衰竭",
+  "logic_trend_break": "趋势破坏",
+  "logic_thesis_invalidated": "消息证伪",
+  "logic_time_take_profit": "时间止盈",
+  "stop_technical": "技术位",
+  "stop_time": "时间",
+  "stop_logic_fail": "逻辑失效",
+  "stop_max_loss": "最大亏损",
+  "label_welcome_back": "欢迎回来",
+  "tip_enter_email": "请输入邮箱以获取验证码",
+  "label_email": "邮箱",
+  "hint_email": "请输入您的邮箱地址",
+  "action_send_otp": "发送验证码",
+  "tip_invalid_email": "请输入有效的邮箱地址",
+  "tip_send_otp_failed": "发送验证码失败，请重试",
+  "title_verify_otp": "验证码",
+  "tip_otp_sent_to": "验证码已发送至 {email}",
+  "label_otp": "验证码",
+  "action_verify": "验证",
+  "tip_invalid_otp": "请输入6位验证码",
+  "tip_verify_failed": "验证失败，请检查验证码",
+  "action_back_to_edit_email": "返回修改邮箱",
+  "label_all_statuses": "全部状态",
+  "tip_no_archived_plans": "暂无归档计划",
+  "action_unarchive": "取消归档",
+  "tip_unarchived_success": "已取消归档",
+  "label_target_range_with_values": "目标: {low} ~ {high}",
+  "label_direction_with_value": "方向: {direction}",
+  "title_manage_watchlist": "管理关注股票",
+  "title_select_watchlist": "选择你关注的股票",
+  "tip_add_at_least_one": "请至少添加 1 只股票以开始使用",
+  "hint_search_symbol": "输入代码/名称/行业",
+  "label_all_industries": "全部行业",
+  "tip_symbol_not_found": "未找到相关股票",
+  "action_seed_data": "灌入测试数据 (Seed)",
+  "tip_added_symbol": "已添加 {name}",
+  "label_added": "已添加",
+  "action_enter_app": "进入应用",
+  "title_subscription_limit": "订阅限制",
+  "tip_subscription_limit_msg": "免费版仅可添加 1 只股票。请升级以解锁更多名额。",
+  "action_learn_more_upgrade": "了解升级",
+  "tip_seed_success": "测试数据灌入成功，请重新搜索",
+  "tip_seed_failed": "灌入失败: {error}\n请确保已运行 npx wrangler d1 execute ... 初始化数据库",
+  "label_nav_journal": "复盘",
+  "label_nav_alerts": "异动",
+  "label_nav_stats": "统计",
+  "tip_alerts_placeholder": "异动 (Step 4 实现)",
+  "tip_plan_locked": "计划已锁定；后续调整会以“修订记录”形式保存。",
+  "action_revise_target": "修订目标区间",
+  "title_revise_target": "修订目标区间",
+  "label_event_timeline": "事件线",
+  "action_add_event": "新增事件",
+  "label_comparison_status": "对照状态",
+  "label_fact_only": "只显示事实，不提供建议",
+  "label_defined": "已定义",
+  "label_undefined": "未定义",
+  "label_exit_trigger_event": "退出触发事件",
+  "label_yes_with_count": "有 ({count})",
+  "@label_yes_with_count": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "tip_exit_event_recorded": "已记录 {count} 条事件标注为“触发退出条件”。请在卖出时选择原因并完成对照复盘。",
+  "@tip_exit_event_recorded": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "label_time_take_profit_condition": "• 时间止盈条件：{days} 天（从建计划开始计）",
+  "@label_time_take_profit_condition": {
+    "placeholders": {
+      "days": {
+        "type": "int"
+      }
+    }
+  }
+}

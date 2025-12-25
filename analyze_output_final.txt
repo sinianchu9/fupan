@@ -1,0 +1,19 @@
+﻿Analyzing fupan...                                              
+
+   info - Don't invoke 'print' in production code - lib\core\api\auth_service.dart:26:7 - avoid_print
+   info - Don't invoke 'print' in production code - lib\core\api\auth_service.dart:27:7 - avoid_print
+   info - Don't invoke 'print' in production code - lib\core\api\auth_service.dart:30:7 - avoid_print
+   info - Don't invoke 'print' in production code - lib\core\api\auth_service.dart:48:7 - avoid_print
+   info - Don't invoke 'print' in production code - lib\core\api\auth_service.dart:49:7 - avoid_print
+   info - Don't invoke 'print' in production code - lib\core\api\auth_service.dart:52:7 - avoid_print
+   info - Statements in an if should be enclosed in a block - lib\features\journal\create_plan_page.dart:313:21 - curly_braces_in_flow_control_structures
+   info - 'value' is deprecated and shouldn't be used. Use initialValue instead. This will set the initial value for the form field. This feature was deprecated after v3.33.0-1.0.pre - lib\features\journal\create_plan_page.dart:348:21 - deprecated_member_use
+   info - 'value' is deprecated and shouldn't be used. Use initialValue instead. This will set the initial value for the form field. This feature was deprecated after v3.33.0-1.0.pre - lib\features\journal\create_plan_page.dart:391:7 - deprecated_member_use
+   info - Statements in an if should be enclosed in a block - lib\features\journal\create_plan_page.dart:519:13 - curly_braces_in_flow_control_structures
+   info - 'groupValue' is deprecated and shouldn't be used. Use a RadioGroup ancestor to manage group value instead. This feature was deprecated after v3.32.0-0.0.pre - lib\features\journal\widgets\close_trade_sheet.dart:183:15 - deprecated_member_use
+   info - 'onChanged' is deprecated and shouldn't be used. Use RadioGroup to handle value change instead. This feature was deprecated after v3.32.0-0.0.pre - lib\features\journal\widgets\close_trade_sheet.dart:184:15 - deprecated_member_use
+   info - Don't use 'BuildContext's across async gaps - lib\features\onboarding\onboarding_watchlist_page.dart:55:40 - use_build_context_synchronously
+   info - Don't use 'BuildContext's across async gaps - lib\features\onboarding\onboarding_watchlist_page.dart:88:40 - use_build_context_synchronously
+   info - Don't use 'BuildContext's across async gaps - lib\features\onboarding\onboarding_watchlist_page.dart:116:42 - use_build_context_synchronously
+   info - Don't use 'BuildContext's across async gaps - lib\features\onboarding\onboarding_watchlist_page.dart:136:40 - use_build_context_synchronously
+

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:fupan/l10n/generated/app_localizations.dart';
 import '../../../models/plan_detail.dart';
 import '../../../models/trade_event.dart';
 
@@ -10,6 +11,7 @@ class PlanCompareCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     final hasTarget = plan.targetLow > 0 || plan.targetHigh > 0;
     final hasStop =
         plan.stopType != 'none' &&
@@ -24,15 +26,21 @@ class PlanCompareCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  '对照状态',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(width: 8),
                 Text(
-                  '只显示事实，不提供建议',
+                  l10n.label_comparison_status,
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  l10n.label_fact_only,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
                   style: TextStyle(fontSize: 12, color: Colors.grey[600]),
                 ),
               ],
@@ -40,26 +48,28 @@ class PlanCompareCard extends StatelessWidget {
             const SizedBox(height: 16),
             _buildStatusItem(
               Icons.track_changes,
-              '目标区间',
-              hasTarget ? '已定义' : '未定义',
+              l10n.label_target_range,
+              hasTarget ? l10n.label_defined : l10n.label_undefined,
               hasTarget,
             ),
             _buildStatusItem(
               Icons.shield_outlined,
-              '止损逻辑',
-              hasStop ? '已定义' : '未定义',
+              l10n.label_stop_logic,
+              hasStop ? l10n.label_defined : l10n.label_undefined,
               hasStop,
             ),
             _buildStatusItem(
               Icons.sell_outlined,
-              '卖出条件',
-              hasSellConditions ? '已定义' : '未定义',
+              l10n.label_sell_logic,
+              hasSellConditions ? l10n.label_defined : l10n.label_undefined,
               hasSellConditions,
             ),
             _buildStatusItem(
               Icons.warning_amber_rounded,
-              '退出触发事件',
-              hasExitTrigger ? '有 (${exitEvents.length})' : '无',
+              l10n.label_exit_trigger_event,
+              hasExitTrigger
+                  ? l10n.label_yes_with_count(exitEvents.length)
+                  : l10n.label_none,
               !hasExitTrigger,
               isWarning: hasExitTrigger,
             ),
@@ -69,11 +79,9 @@ class PlanCompareCard extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: Colors.orange.withValues(alpha: 0.1),
+                  color: Colors.orange.withAlpha(25),
                   borderRadius: BorderRadius.circular(8),
-                  border: Border.all(
-                    color: Colors.orange.withValues(alpha: 0.3),
-                  ),
+                  border: Border.all(color: Colors.orange.withAlpha(75)),
                 ),
                 child: Row(
                   children: [
@@ -85,7 +93,7 @@ class PlanCompareCard extends StatelessWidget {
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
-                        '已记录 ${exitEvents.length} 条事件标注为“触发退出条件”。请在卖出时选择原因并完成对照复盘。',
+                        l10n.tip_exit_event_recorded(exitEvents.length),
                         style: const TextStyle(
                           fontSize: 12,
                           color: Colors.orange,
@@ -101,7 +109,7 @@ class PlanCompareCard extends StatelessWidget {
                 plan.timeTakeProfitDays != null) ...[
               const SizedBox(height: 8),
               Text(
-                '• 时间止盈条件：${plan.timeTakeProfitDays} 天（从建计划开始计）',
+                l10n.label_time_take_profit_condition(plan.timeTakeProfitDays!),
                 style: const TextStyle(fontSize: 12, color: Colors.blueGrey),
               ),
             ],
@@ -127,8 +135,7 @@ class PlanCompareCard extends StatelessWidget {
         children: [
           Icon(icon, size: 16, color: color),
           const SizedBox(width: 8),
-          Text(label, style: const TextStyle(fontSize: 13)),
-          const Spacer(),
+          Expanded(child: Text(label, style: const TextStyle(fontSize: 13))),
           Text(
             value,
             style: TextStyle(

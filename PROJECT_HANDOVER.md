@@ -8,6 +8,7 @@
 
 - **前端框架**: Flutter (Latest Stable)
 - **状态管理**: Riverpod (ConsumerStatefulWidget / Provider)
+- **国际化 (i18n)**: Flutter Localizations (ARB based)
 - **网络请求**: Dio (封装于 `ApiClient`)
 - **本地存储**: `shared_preferences` (用于 `UserSession`)
 - **日期处理**: `intl`
@@ -45,12 +46,27 @@
   - **折叠细则**: 默认收起详细评分标准，保持界面整洁。
   - **只读模式**: 提交后不可修改，作为永久交易记录。
 
+### 3.4 国际化系统 (i18n System) **[新]**
+
+- **架构**: 使用 Flutter 官方的 ARB 方案。
+- **支持语言**: 简体中文 (`zh`)、美式英语 (`en`)。
+- **配置**:
+  - `l10n.yaml` 设置 `synthetic-package: false`，生成的代码位于 `lib/l10n/generated/`。
+  - 使用 `AppLocalizations.of(context)!` 进行文案调用。
+- **Key 命名规范**:
+  - `title_`: 页面标题
+  - `status_`: 业务状态 (Draft, Armed, etc.)
+  - `action_`: 按钮与操作
+  - `label_`: 表单标签
+  - `tip_`: 提示语与错误信息
+  - `deviation_`: 偏离类型描述
+
 ## 4. 核心数据模型 (`lib/models/`)
 
 - `PlanListItem`: 列表简略信息，包含 `isArchived` 状态。
 - `PlanDetail`: 详情全量数据。
-- `SelfReview`: **[新]** 存储 13 个维度的评分数据。
-- `DimensionDef`: **[新]** 静态定义 13 个维度的文案、阶段和评分标准。
+- `SelfReview`: 存储 13 个维度的评分数据。
+- `DimensionDef`: 静态定义 13 个维度的文案、阶段和评分标准。
 - `TradeResult`: 交易结束后的系统判定结果。
 
 ## 5. 后端 API 契约 (`workers/src/index.ts`)
@@ -66,7 +82,7 @@
 
 - `trade_plans`: 存储计划核心数据。
 - `trade_results`: 存储交易结项后的系统判定。
-- `trade_self_reviews`: **[新]** 存储 13 维自评数据，通过 `(user_id, plan_id)` 唯一约束确保复盘的严肃性。
+- `trade_self_reviews`: 存储 13 维自评数据，通过 `(user_id, plan_id)` 唯一约束确保复盘的严肃性。
 
 ## 7. 开发注意事项
 
@@ -74,10 +90,12 @@
 2. **类型转换**: D1 数据库布尔值存储为 `int`，前端解析需使用 `_parseBool` 助手。
 3. **安全合规**: 严禁在后端代码中添加任何打印敏感信息（如 OTP、Token）的 `console.log`。
 4. **异步安全**: 在 Flutter 异步操作后使用 `context` 前，务必检查 `if (!mounted) return;`。
+5. **i18n 同步**: 修改文案时需同时更新 `app_zh.arb` 和 `app_en.arb`，并运行 `flutter gen-l10n`。
 
 ## 8. 当前进度
 
 - [x] 核心交易流与系统判定。
 - [x] 13 维自评系统（前端交互 + 后端校验）。
 - [x] 邮箱验证码登录（Resend 集成 + 安全加固）。
+- [x] **全量国际化 (i18n)**: 所有主要页面已完成中英文适配。
 - [ ] **Next**: 周报统计模块 (Weekly Report) 的深度数据聚合。

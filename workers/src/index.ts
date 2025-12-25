@@ -679,7 +679,11 @@ if (method === "POST" && path.startsWith("/plans/") && path.endsWith("/add-event
     const planId = path.split("/")[2];
     const plan = await getPlan(env, userId, planId);
     if (!plan) return bad("not found", 404);
-    if (plan.status === "closed") return bad("already closed", 409);
+    
+    // ✅ State Machine Integrity: Only 'armed' plans can be closed
+    if (plan.status !== "armed") {
+      return bad(`cannot close plan in '${plan.status}' status`, 403);
+    }
 
     const body = await readJson(req);
     const sell_price = body?.sell_price;
@@ -692,7 +696,7 @@ if (method === "POST" && path.startsWith("/plans/") && path.endsWith("/add-event
     const ts = nowEpoch();
     await env.DB.batch([
       env.DB.prepare(
-        `INSERT OR REPLACE INTO trade_results
+        `INSERT INTO trade_results
          (plan_id, user_id, sell_price, sell_reason, system_judgement, conclusion_text, closed_at)
          VALUES (?, ?, ?, ?, ?, ?, ?)`
       ).bind(planId, userId, Number(sell_price), String(sell_reason), judgement, conclusion, ts),

@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:fupan/l10n/generated/app_localizations.dart';
 import 'core/providers.dart';
+import 'core/locale_provider.dart';
 import 'features/onboarding/onboarding_watchlist_page.dart';
 import 'features/shell/main_shell.dart';
 import 'models/watchlist_item.dart';
-
 import 'features/auth/login_page.dart';
+import 'core/theme.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -13,6 +16,9 @@ void main() async {
   final container = ProviderContainer();
   final userSession = container.read(userSessionProvider);
   await userSession.init();
+
+  // Initialize locale from saved preferences
+  await container.read(localeProvider.notifier).init();
 
   runApp(
     UncontrolledProviderScope(container: container, child: const FupanApp()),
@@ -37,16 +43,21 @@ class FupanApp extends ConsumerWidget {
       }
     });
 
+    // Watch locale state
+    final locale = ref.watch(localeProvider);
+
     return MaterialApp(
       navigatorKey: navigatorKey,
-      title: '交易前置复盘日记',
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: Colors.blueGrey,
-          brightness: Brightness.dark,
-        ),
-        useMaterial3: true,
-      ),
+      onGenerateTitle: (context) => AppLocalizations.of(context)!.title_journal,
+      localizationsDelegates: const [
+        AppLocalizations.delegate,
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
+      supportedLocales: const [Locale('zh'), Locale('en')],
+      locale: locale, // Use user-selected locale (null = follow system)
+      theme: AppTheme.lightTheme,
       home: const StartupFlow(),
     );
   }

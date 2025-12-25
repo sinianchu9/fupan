@@ -51,6 +51,8 @@ class ResultCard extends StatelessWidget {
               ),
               child: Text(
                 result.conclusionText,
+                maxLines: 4,
+                overflow: TextOverflow.ellipsis,
                 style: const TextStyle(
                   fontSize: 15,
                   fontWeight: FontWeight.w500,
@@ -99,13 +101,22 @@ class ResultCard extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: const TextStyle(color: Colors.grey, fontSize: 13)),
-          Text(
-            value,
-            style: TextStyle(
-              fontSize: 13,
-              fontWeight: isJudgement ? FontWeight.bold : FontWeight.normal,
-              color: valueColor,
+          Expanded(
+            child: Text(
+              label,
+              style: const TextStyle(color: Colors.grey, fontSize: 13),
+            ),
+          ),
+          Flexible(
+            child: Text(
+              value,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: isJudgement ? FontWeight.bold : FontWeight.normal,
+                color: valueColor,
+              ),
             ),
           ),
         ],

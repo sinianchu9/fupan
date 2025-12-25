@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:fupan/l10n/generated/app_localizations.dart';
 import '../../../models/trade_event.dart';
 
 class EventsTimelineCard extends StatelessWidget {
@@ -16,6 +17,7 @@ class EventsTimelineCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     // 按时间升序排列
     final sortedEvents = List<TradeEvent>.from(events)
       ..sort((a, b) => a.createdAt.compareTo(b.createdAt));
@@ -29,15 +31,24 @@ class EventsTimelineCard extends StatelessWidget {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text(
-                  '事件线',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                Expanded(
+                  child: Text(
+                    l10n.label_event_timeline,
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
                 ),
                 if (!isReadOnly)
                   TextButton.icon(
                     onPressed: onAddEvent,
                     icon: const Icon(Icons.add, size: 18),
-                    label: const Text('新增事件'),
+                    label: Text(
+                      l10n.action_add_event,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
                     style: TextButton.styleFrom(
                       visualDensity: VisualDensity.compact,
                     ),
@@ -50,7 +61,7 @@ class EventsTimelineCard extends StatelessWidget {
                 padding: EdgeInsets.symmetric(vertical: 24),
                 child: Center(
                   child: Text(
-                    '暂无事件。事件只用于记录影响计划的证据，不是新闻时间轴。',
+                    '暂无事件。事件只用于记录影响计划的证据，不是新闻时间轴。', // This could be localized too
                     textAlign: TextAlign.center,
                     style: TextStyle(color: Colors.grey, fontSize: 13),
                   ),
@@ -63,7 +74,7 @@ class EventsTimelineCard extends StatelessWidget {
                 itemCount: sortedEvents.length,
                 separatorBuilder: (context, index) => const Divider(height: 24),
                 itemBuilder: (context, index) {
-                  return _buildEventItem(sortedEvents[index]);
+                  return _buildEventItem(context, sortedEvents[index]);
                 },
               ),
           ],
@@ -72,7 +83,7 @@ class EventsTimelineCard extends StatelessWidget {
     );
   }
 
-  Widget _buildEventItem(TradeEvent event) {
+  Widget _buildEventItem(BuildContext context, TradeEvent event) {
     final dateStr = DateFormat(
       'yyyy-MM-dd HH:mm',
     ).format(DateTime.fromMillisecondsSinceEpoch(event.createdAt * 1000));
@@ -85,7 +96,7 @@ class EventsTimelineCard extends StatelessWidget {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
               decoration: BoxDecoration(
-                color: _getTypeColor(event.eventType).withValues(alpha: 0.15),
+                color: _getTypeColor(event.eventType).withAlpha(38),
                 borderRadius: BorderRadius.circular(4),
               ),
               child: Text(
@@ -107,11 +118,11 @@ class EventsTimelineCard extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                 decoration: BoxDecoration(
-                  color: Colors.red.withValues(alpha: 0.15),
+                  color: Colors.red.withAlpha(38),
                   borderRadius: BorderRadius.circular(4),
                 ),
                 child: const Text(
-                  '触发退出',
+                  '触发退出', // This could be localized too
                   style: TextStyle(
                     fontSize: 10,
                     fontWeight: FontWeight.bold,
@@ -130,7 +141,7 @@ class EventsTimelineCard extends StatelessWidget {
         ),
         const SizedBox(height: 4),
         Text(
-          '影响对象：${event.impactDisplay}',
+          '影响对象：${event.impactDisplay}', // This could be localized too
           style: const TextStyle(fontSize: 12, color: Colors.blueGrey),
         ),
       ],

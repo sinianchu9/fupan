@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:fupan/l10n/generated/app_localizations.dart';
 import '../../core/providers.dart';
 import '../../models/watchlist_item.dart';
 
@@ -33,39 +34,50 @@ class _CreatePlanPageState extends ConsumerState<CreatePlanPage> {
   final TextEditingController _stopTimeDaysController = TextEditingController();
   final TextEditingController _entryPriceController = TextEditingController();
 
-  // Data Dictionaries
-  final Map<String, String> _buyReasonTypes = {
-    'trend': '趋势',
-    'range': '震荡',
-    'policy': '政策',
-    'industry': '行业',
-    'earnings': '财报',
-    'sentiment': '情绪',
-    'probe': '试仓',
-    'other': '其他',
-  };
+  Map<String, String> _getBuyReasonTypes(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    return {
+      'trend': l10n.reason_trend,
+      'range': l10n.reason_range,
+      'policy': l10n.reason_policy,
+      'industry': l10n.reason_industry,
+      'earnings': l10n.reason_earnings,
+      'sentiment': l10n.reason_sentiment,
+      'probe': l10n.reason_probe,
+      'other': l10n.reason_other,
+    };
+  }
 
-  final Map<String, String> _targetTypes = {
-    'technical': '技术位',
-    'previous_high': '前高',
-    'event': '事件兑现',
-    'trend': '趋势延续',
-  };
+  Map<String, String> _getTargetTypes(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    return {
+      'technical': l10n.target_technical,
+      'previous_high': l10n.target_previous_high,
+      'event': l10n.target_event,
+      'trend': l10n.target_trend,
+    };
+  }
 
-  final Map<String, String> _sellConditions = {
-    'reach_target': '到达目标区',
-    'volume_exhaust': '量能衰竭',
-    'trend_break': '趋势破坏',
-    'thesis_invalidated': '消息证伪',
-    'time_take_profit': '时间止盈',
-  };
+  Map<String, String> _getSellConditions(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    return {
+      'reach_target': l10n.logic_reach_target,
+      'volume_exhaust': l10n.logic_volume_exhaust,
+      'trend_break': l10n.logic_trend_break,
+      'thesis_invalidated': l10n.logic_thesis_invalidated,
+      'time_take_profit': l10n.logic_time_take_profit,
+    };
+  }
 
-  final Map<String, String> _stopTypes = {
-    'technical': '技术位',
-    'time': '时间',
-    'logic_fail': '逻辑失效',
-    'max_loss': '最大亏损',
-  };
+  Map<String, String> _getStopTypes(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    return {
+      'technical': l10n.stop_technical,
+      'time': l10n.stop_time,
+      'logic_fail': l10n.stop_logic_fail,
+      'max_loss': l10n.stop_max_loss,
+    };
+  }
 
   @override
   void initState() {
@@ -97,21 +109,25 @@ class _CreatePlanPageState extends ConsumerState<CreatePlanPage> {
         _isFetchingWatchlist = false;
       });
     } catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('获取自选股失败: $e')));
+      if (mounted) {
+        final l10n = AppLocalizations.of(context)!;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(l10n.tip_fetch_failed(e.toString()))),
+        );
+      }
       setState(() => _isFetchingWatchlist = false);
     }
   }
 
   Future<void> _submit() async {
+    final l10n = AppLocalizations.of(context)!;
     if (!_formKey.currentState!.validate()) return;
     if (_selectedBuyReasons.isEmpty) {
-      _showError('请至少选择一个买入理由类型');
+      _showError(l10n.tip_select_buy_reason);
       return;
     }
     if (_selectedSellConditions.isEmpty) {
-      _showError('请至少选择一个卖出逻辑');
+      _showError(l10n.tip_select_sell_logic);
       return;
     }
 
@@ -147,7 +163,7 @@ class _CreatePlanPageState extends ConsumerState<CreatePlanPage> {
         Navigator.of(context).pop(true);
       }
     } catch (e) {
-      _showError('提交失败: $e');
+      _showError(l10n.tip_submit_failed(e.toString()));
     } finally {
       setState(() => _isLoading = false);
     }
@@ -161,22 +177,23 @@ class _CreatePlanPageState extends ConsumerState<CreatePlanPage> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     if (_isFetchingWatchlist) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
     if (_watchlist.isEmpty) {
       return Scaffold(
-        appBar: AppBar(title: const Text('新建交易计划')),
+        appBar: AppBar(title: Text(l10n.title_create_plan)),
         body: Center(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Text('自选股为空，请先添加股票'),
+              Text(l10n.tip_watchlist_empty),
               const SizedBox(height: 16),
               ElevatedButton(
                 onPressed: () => Navigator.pop(context),
-                child: const Text('返回'),
+                child: Text(l10n.action_back),
               ),
             ],
           ),
@@ -186,7 +203,7 @@ class _CreatePlanPageState extends ConsumerState<CreatePlanPage> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('新建交易计划'),
+        title: Text(l10n.title_create_plan),
         actions: [
           if (_isLoading)
             const Center(
@@ -199,7 +216,7 @@ class _CreatePlanPageState extends ConsumerState<CreatePlanPage> {
             TextButton(
               onPressed: _isLoading ? null : _submit,
               child: Text(
-                '保存草稿',
+                l10n.action_save_draft,
                 style: TextStyle(
                   fontWeight: FontWeight.bold,
                   color: _isLoading ? Colors.grey : null,
@@ -213,60 +230,62 @@ class _CreatePlanPageState extends ConsumerState<CreatePlanPage> {
         child: ListView(
           padding: const EdgeInsets.all(16),
           children: [
-            _buildSectionTitle('股票选择'),
+            _buildSectionTitle(l10n.label_symbol_selection),
             _buildSymbolPicker(),
             const SizedBox(height: 24),
 
-            _buildSectionTitle('买入理由'),
-            _buildBuyReasonTypes(),
+            _buildSectionTitle(l10n.label_buy_reason),
+            _buildBuyReasonTypes(context),
             const SizedBox(height: 16),
             TextFormField(
               controller: _buyReasonTextController,
-              decoration: const InputDecoration(
-                labelText: '一句话理由',
-                hintText: '用人话说一句 (50字以内)',
-                border: OutlineInputBorder(),
+              decoration: InputDecoration(
+                labelText: l10n.label_buy_reason_one_liner,
+                hintText: l10n.hint_buy_reason_one_liner,
+                border: const OutlineInputBorder(),
               ),
               maxLength: 50,
-              validator: (v) => (v == null || v.trim().isEmpty) ? '必填' : null,
+              validator: (v) =>
+                  (v == null || v.trim().isEmpty) ? l10n.tip_required : null,
             ),
             const SizedBox(height: 24),
 
-            _buildSectionTitle('预期卖出目标'),
-            _buildTargetTypePicker(),
+            _buildSectionTitle(l10n.label_target_sell_price),
+            _buildTargetTypePicker(context),
             const SizedBox(height: 16),
             Row(
               children: [
                 Expanded(
                   child: TextFormField(
                     controller: _targetLowController,
-                    decoration: const InputDecoration(
-                      labelText: '目标低位',
-                      border: OutlineInputBorder(),
+                    decoration: InputDecoration(
+                      labelText: l10n.label_target_low,
+                      border: const OutlineInputBorder(),
                     ),
                     keyboardType: const TextInputType.numberWithOptions(
                       decimal: true,
                     ),
-                    validator: (v) => (v == null || v.isEmpty) ? '必填' : null,
+                    validator: (v) =>
+                        (v == null || v.isEmpty) ? l10n.tip_required : null,
                   ),
                 ),
                 const SizedBox(width: 16),
                 Expanded(
                   child: TextFormField(
                     controller: _targetHighController,
-                    decoration: const InputDecoration(
-                      labelText: '目标高位',
-                      border: OutlineInputBorder(),
+                    decoration: InputDecoration(
+                      labelText: l10n.label_target_high,
+                      border: const OutlineInputBorder(),
                     ),
                     keyboardType: const TextInputType.numberWithOptions(
                       decimal: true,
                     ),
                     validator: (v) {
-                      if (v == null || v.isEmpty) return '必填';
+                      if (v == null || v.isEmpty) return l10n.tip_required;
                       final high = double.tryParse(v);
                       final low = double.tryParse(_targetLowController.text);
                       if (high != null && low != null && high <= low) {
-                        return '须大于低位';
+                        return l10n.tip_greater_than_low;
                       }
                       return null;
                     },
@@ -276,31 +295,33 @@ class _CreatePlanPageState extends ConsumerState<CreatePlanPage> {
             ),
             const SizedBox(height: 24),
 
-            _buildSectionTitle('预期卖出逻辑'),
-            _buildSellConditions(),
+            _buildSectionTitle(l10n.label_sell_logic_expected),
+            _buildSellConditions(context),
             if (_selectedSellConditions.contains('time_take_profit')) ...[
               const SizedBox(height: 16),
               TextFormField(
                 controller: _timeTakeProfitDaysController,
-                decoration: const InputDecoration(
-                  labelText: '时间止盈天数',
-                  border: OutlineInputBorder(),
+                decoration: InputDecoration(
+                  labelText: l10n.label_time_take_profit_days,
+                  border: const OutlineInputBorder(),
                 ),
                 keyboardType: TextInputType.number,
                 validator: (v) {
-                  if (v == null || v.isEmpty) return '必填';
+                  if (v == null || v.isEmpty) return l10n.tip_required;
                   final days = int.tryParse(v);
-                  if (days == null || days < 1) return '须 >= 1';
+                  if (days == null || days < 1) {
+                    return l10n.tip_greater_than_zero;
+                  }
                   return null;
                 },
               ),
             ],
             const SizedBox(height: 24),
 
-            _buildSectionTitle('止损逻辑'),
-            _buildStopTypePicker(),
+            _buildSectionTitle(l10n.label_stop_loss_logic),
+            _buildStopTypePicker(context),
             const SizedBox(height: 16),
-            _buildStopTypeFields(),
+            _buildStopTypeFields(context),
             const SizedBox(height: 24),
 
             Theme(
@@ -308,16 +329,16 @@ class _CreatePlanPageState extends ConsumerState<CreatePlanPage> {
                 context,
               ).copyWith(dividerColor: Colors.transparent),
               child: ExpansionTile(
-                title: const Text(
-                  '高级选项',
-                  style: TextStyle(fontSize: 14, color: Colors.grey),
+                title: Text(
+                  l10n.label_advanced_options,
+                  style: const TextStyle(fontSize: 14, color: Colors.grey),
                 ),
                 children: [
                   TextFormField(
                     controller: _entryPriceController,
-                    decoration: const InputDecoration(
-                      labelText: '预期买入价 (可选)',
-                      border: OutlineInputBorder(),
+                    decoration: InputDecoration(
+                      labelText: l10n.label_expected_entry_price,
+                      border: const OutlineInputBorder(),
                     ),
                     keyboardType: const TextInputType.numberWithOptions(
                       decimal: true,
@@ -326,15 +347,18 @@ class _CreatePlanPageState extends ConsumerState<CreatePlanPage> {
                   const SizedBox(height: 16),
                   DropdownButtonFormField<String>(
                     initialValue: _direction,
-                    decoration: const InputDecoration(
-                      labelText: '交易方向',
-                      border: OutlineInputBorder(),
+                    decoration: InputDecoration(
+                      labelText: l10n.label_trade_direction,
+                      border: const OutlineInputBorder(),
                     ),
-                    items: const [
-                      DropdownMenuItem(value: 'long', child: Text('做多 (Long)')),
+                    items: [
+                      DropdownMenuItem(
+                        value: 'long',
+                        child: Text(l10n.label_long),
+                      ),
                       DropdownMenuItem(
                         value: 'short',
-                        child: Text('做空 (Short)'),
+                        child: Text(l10n.label_short),
                       ),
                     ],
                     onChanged: (v) => setState(() => _direction = v!),
@@ -364,29 +388,41 @@ class _CreatePlanPageState extends ConsumerState<CreatePlanPage> {
   }
 
   Widget _buildSymbolPicker() {
-    return DropdownButtonFormField<String>(
-      initialValue: _selectedSymbolId,
-      decoration: const InputDecoration(border: OutlineInputBorder()),
-      items: _watchlist
-          .map(
-            (s) => DropdownMenuItem(
-              value: s.symbolId,
-              child: Text('${s.code} ${s.name}'),
-            ),
-          )
-          .toList(),
-      onChanged: (v) => setState(() => _selectedSymbolId = v),
+    return Row(
+      children: [
+        Expanded(
+          child: DropdownButtonFormField<String>(
+            initialValue: _selectedSymbolId,
+            isExpanded: true,
+            decoration: const InputDecoration(border: OutlineInputBorder()),
+            items: _watchlist
+                .map(
+                  (s) => DropdownMenuItem(
+                    value: s.symbolId,
+                    child: Text(
+                      '${s.code} ${s.name}',
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                )
+                .toList(),
+            onChanged: (v) => setState(() => _selectedSymbolId = v),
+          ),
+        ),
+      ],
     );
   }
 
-  Widget _buildBuyReasonTypes() {
+  Widget _buildBuyReasonTypes(BuildContext context) {
+    final buyReasonTypes = _getBuyReasonTypes(context);
     return Wrap(
       spacing: 8,
-      children: _buyReasonTypes.entries.map((e) {
+      children: buyReasonTypes.entries.map((e) {
         final isSelected = _selectedBuyReasons.contains(e.key);
         return FilterChip(
-          label: Text(e.value),
+          label: Text(e.value, maxLines: 1, overflow: TextOverflow.ellipsis),
           selected: isSelected,
+          visualDensity: const VisualDensity(horizontal: 0, vertical: 2),
           onSelected: (selected) {
             setState(() {
               if (selected) {
@@ -401,13 +437,15 @@ class _CreatePlanPageState extends ConsumerState<CreatePlanPage> {
     );
   }
 
-  Widget _buildTargetTypePicker() {
+  Widget _buildTargetTypePicker(BuildContext context) {
+    final targetTypes = _getTargetTypes(context);
     return Wrap(
       spacing: 8,
-      children: _targetTypes.entries.map((e) {
+      children: targetTypes.entries.map((e) {
         return ChoiceChip(
-          label: Text(e.value),
+          label: Text(e.value, maxLines: 1, overflow: TextOverflow.ellipsis),
           selected: _targetType == e.key,
+          visualDensity: const VisualDensity(horizontal: 0, vertical: 2),
           onSelected: (selected) {
             if (selected) setState(() => _targetType = e.key);
           },
@@ -416,14 +454,16 @@ class _CreatePlanPageState extends ConsumerState<CreatePlanPage> {
     );
   }
 
-  Widget _buildSellConditions() {
+  Widget _buildSellConditions(BuildContext context) {
+    final sellConditions = _getSellConditions(context);
     return Wrap(
       spacing: 8,
-      children: _sellConditions.entries.map((e) {
+      children: sellConditions.entries.map((e) {
         final isSelected = _selectedSellConditions.contains(e.key);
         return FilterChip(
-          label: Text(e.value),
+          label: Text(e.value, maxLines: 1, overflow: TextOverflow.ellipsis),
           selected: isSelected,
+          visualDensity: const VisualDensity(horizontal: 0, vertical: 2),
           onSelected: (selected) {
             setState(() {
               if (selected) {
@@ -438,13 +478,15 @@ class _CreatePlanPageState extends ConsumerState<CreatePlanPage> {
     );
   }
 
-  Widget _buildStopTypePicker() {
+  Widget _buildStopTypePicker(BuildContext context) {
+    final stopTypes = _getStopTypes(context);
     return Wrap(
       spacing: 8,
-      children: _stopTypes.entries.map((e) {
+      children: stopTypes.entries.map((e) {
         return ChoiceChip(
-          label: Text(e.value),
+          label: Text(e.value, maxLines: 1, overflow: TextOverflow.ellipsis),
           selected: _stopType == e.key,
+          visualDensity: const VisualDensity(horizontal: 0, vertical: 2),
           onSelected: (selected) {
             if (selected) setState(() => _stopType = e.key);
           },
@@ -453,41 +495,44 @@ class _CreatePlanPageState extends ConsumerState<CreatePlanPage> {
     );
   }
 
-  Widget _buildStopTypeFields() {
+  Widget _buildStopTypeFields(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     if (_stopType == 'technical') {
       return TextFormField(
         controller: _stopValueController,
-        decoration: const InputDecoration(
-          labelText: '止损价',
-          border: OutlineInputBorder(),
+        decoration: InputDecoration(
+          labelText: l10n.label_stop_price,
+          border: const OutlineInputBorder(),
         ),
         keyboardType: const TextInputType.numberWithOptions(decimal: true),
-        validator: (v) => (v == null || v.isEmpty) ? '必填' : null,
+        validator: (v) => (v == null || v.isEmpty) ? l10n.tip_required : null,
       );
     } else if (_stopType == 'time') {
       return TextFormField(
         controller: _stopTimeDaysController,
-        decoration: const InputDecoration(
-          labelText: '止损天数',
-          border: OutlineInputBorder(),
+        decoration: InputDecoration(
+          labelText: l10n.label_stop_days,
+          border: const OutlineInputBorder(),
         ),
         keyboardType: TextInputType.number,
-        validator: (v) => (v == null || v.isEmpty) ? '必填' : null,
+        validator: (v) => (v == null || v.isEmpty) ? l10n.tip_required : null,
       );
     } else if (_stopType == 'max_loss') {
       return TextFormField(
         controller: _stopValueController,
-        decoration: const InputDecoration(
-          labelText: '最大亏损 (%)',
-          hintText: '例如 5 表示 5%',
-          border: OutlineInputBorder(),
+        decoration: InputDecoration(
+          labelText: l10n.label_max_loss_percent,
+          hintText: l10n.hint_max_loss,
+          border: const OutlineInputBorder(),
           suffixText: '%',
         ),
         keyboardType: const TextInputType.numberWithOptions(decimal: true),
         validator: (v) {
-          if (v == null || v.isEmpty) return '必填';
+          if (v == null || v.isEmpty) return l10n.tip_required;
           final val = double.tryParse(v);
-          if (val == null || val <= 0 || val > 100) return '请输入 1~100';
+          if (val == null || val <= 0 || val > 100) {
+            return l10n.tip_invalid_loss_percent;
+          }
           return null;
         },
       );

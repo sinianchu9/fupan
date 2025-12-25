@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:fupan/l10n/generated/app_localizations.dart';
 import '../../core/providers.dart';
 import '../../models/plan_list_item.dart';
 import 'plan_detail_page.dart';
@@ -34,35 +35,38 @@ class _ArchivedPlansPageState extends ConsumerState<ArchivedPlansPage> {
       });
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('加载失败: $e')));
+      final l10n = AppLocalizations.of(context)!;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l10n.tip_fetch_failed(e.toString()))),
+      );
       setState(() => _isLoading = false);
     }
   }
 
   Future<void> _unarchivePlan(String planId) async {
+    final l10n = AppLocalizations.of(context)!;
     try {
       final apiClient = ref.read(apiClientProvider);
       await apiClient.unarchivePlan(planId);
       if (!mounted) return;
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(const SnackBar(content: Text('已取消归档')));
+      ).showSnackBar(SnackBar(content: Text(l10n.tip_unarchived_success)));
       _fetchPlans();
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('操作失败: $e')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l10n.tip_submit_failed(e.toString()))),
+      );
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Scaffold(
       appBar: AppBar(
-        title: const Text('已归档计划'),
+        title: Text(l10n.title_archived_plans),
         actions: [
           PopupMenuButton<String?>(
             icon: const Icon(Icons.filter_list),
@@ -71,11 +75,11 @@ class _ArchivedPlansPageState extends ConsumerState<ArchivedPlansPage> {
               _fetchPlans();
             },
             itemBuilder: (context) => [
-              const PopupMenuItem(value: null, child: Text('全部状态')),
-              const PopupMenuItem(value: 'draft', child: Text('草稿')),
-              const PopupMenuItem(value: 'armed', child: Text('已武装')),
-              const PopupMenuItem(value: 'holding', child: Text('持仓')),
-              const PopupMenuItem(value: 'closed', child: Text('已结束')),
+              PopupMenuItem(value: null, child: Text(l10n.label_all_statuses)),
+              PopupMenuItem(value: 'draft', child: Text(l10n.status_draft)),
+              PopupMenuItem(value: 'armed', child: Text(l10n.status_armed)),
+              PopupMenuItem(value: 'holding', child: Text(l10n.status_holding)),
+              PopupMenuItem(value: 'closed', child: Text(l10n.status_closed)),
             ],
           ),
         ],
@@ -85,7 +89,7 @@ class _ArchivedPlansPageState extends ConsumerState<ArchivedPlansPage> {
         child: _isLoading
             ? const Center(child: CircularProgressIndicator())
             : _plans.isEmpty
-            ? const Center(child: Text('暂无归档计划'))
+            ? Center(child: Text(l10n.tip_no_archived_plans))
             : ListView.builder(
                 padding: const EdgeInsets.all(12),
                 itemCount: _plans.length,
@@ -99,6 +103,7 @@ class _ArchivedPlansPageState extends ConsumerState<ArchivedPlansPage> {
   }
 
   Widget _buildPlanCard(PlanListItem plan) {
+    final l10n = AppLocalizations.of(context)!;
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       clipBehavior: Clip.antiAlias,
@@ -123,6 +128,8 @@ class _ArchivedPlansPageState extends ConsumerState<ArchivedPlansPage> {
                   Expanded(
                     child: Text(
                       '${plan.symbolCode} ${plan.symbolName}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
@@ -146,14 +153,21 @@ class _ArchivedPlansPageState extends ConsumerState<ArchivedPlansPage> {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text(
-                    '目标: ${plan.targetLow} ~ ${plan.targetHigh}',
+                    l10n.label_target_range_with_values(
+                      plan.targetLow.toString(),
+                      plan.targetHigh.toString(),
+                    ),
                     style: const TextStyle(
                       fontSize: 12,
                       color: Colors.blueGrey,
                     ),
                   ),
                   Text(
-                    '方向: ${plan.direction == 'long' ? '做多' : '做空'}',
+                    l10n.label_direction_with_value(
+                      plan.direction == 'long'
+                          ? l10n.label_long
+                          : l10n.label_short,
+                    ),
                     style: TextStyle(
                       fontSize: 12,
                       color: plan.direction == 'long'
@@ -172,20 +186,30 @@ class _ArchivedPlansPageState extends ConsumerState<ArchivedPlansPage> {
   }
 
   Widget _buildStatusBadge(PlanListItem plan) {
+    final l10n = AppLocalizations.of(context)!;
     Color color = Colors.grey;
-    if (plan.status == 'armed') color = Colors.blue;
-    if (plan.status == 'holding') color = Colors.orange;
-    if (plan.status == 'closed') color = Colors.green;
+    String label = l10n.status_draft;
+
+    if (plan.status == 'armed') {
+      color = Colors.blue;
+      label = l10n.status_armed;
+    } else if (plan.status == 'holding') {
+      color = Colors.orange;
+      label = l10n.status_holding;
+    } else if (plan.status == 'closed') {
+      color = Colors.green;
+      label = l10n.status_closed;
+    }
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.1),
+        color: color.withAlpha(25),
         borderRadius: BorderRadius.circular(4),
-        border: Border.all(color: color.withValues(alpha: 0.3)),
+        border: Border.all(color: color.withAlpha(75)),
       ),
       child: Text(
-        plan.statusDisplay,
+        label,
         style: TextStyle(
           color: color,
           fontSize: 10,
@@ -196,6 +220,7 @@ class _ArchivedPlansPageState extends ConsumerState<ArchivedPlansPage> {
   }
 
   Widget _buildCardMenu(PlanListItem plan) {
+    final l10n = AppLocalizations.of(context)!;
     return PopupMenuButton<String>(
       icon: const Icon(Icons.more_vert, size: 20, color: Colors.grey),
       padding: EdgeInsets.zero,
@@ -212,23 +237,23 @@ class _ArchivedPlansPageState extends ConsumerState<ArchivedPlansPage> {
         }
       },
       itemBuilder: (context) => [
-        const PopupMenuItem(
+        PopupMenuItem(
           value: 'unarchive',
           child: Row(
             children: [
-              Icon(Icons.unarchive_outlined, size: 18),
-              SizedBox(width: 8),
-              Text('取消归档'),
+              const Icon(Icons.unarchive_outlined, size: 18),
+              const SizedBox(width: 8),
+              Text(l10n.action_unarchive),
             ],
           ),
         ),
-        const PopupMenuItem(
+        PopupMenuItem(
           value: 'detail',
           child: Row(
             children: [
-              Icon(Icons.description_outlined, size: 18),
-              SizedBox(width: 8),
-              Text('查看详情'),
+              const Icon(Icons.description_outlined, size: 18),
+              const SizedBox(width: 8),
+              Text(l10n.action_view_detail),
             ],
           ),
         ),

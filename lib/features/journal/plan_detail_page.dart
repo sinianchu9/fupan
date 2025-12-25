@@ -1,17 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+import 'package:fupan/l10n/generated/app_localizations.dart';
 import '../../core/providers.dart';
+import '../../core/theme.dart';
 import '../../models/plan_detail.dart';
-import '../../models/plan_detail_response.dart';
 import '../../models/plan_edit.dart';
-import './widgets/plan_compare_card.dart';
-import './widgets/events_timeline_card.dart';
-import './widgets/add_event_sheet.dart';
-import './widgets/result_card.dart';
-import './widgets/close_trade_sheet.dart';
-import './self_assessment_page.dart';
-import '../../models/self_review.dart';
+import '../../models/plan_detail_response.dart';
+import 'self_assessment_page.dart';
+import 'widgets/plan_compare_card.dart';
+import 'widgets/events_timeline_card.dart';
+import 'widgets/add_event_sheet.dart';
+import 'widgets/revise_target_sheet.dart';
+import 'widgets/result_card.dart';
+import '../../models/close_plan_request.dart';
 
 class PlanDetailPage extends ConsumerStatefulWidget {
   final String planId;
@@ -28,315 +30,130 @@ class _PlanDetailPageState extends ConsumerState<PlanDetailPage> {
   @override
   void initState() {
     super.initState();
-    _fetchDetail();
+    _loadDetail();
   }
 
-  Future<void> _fetchDetail() async {
+  Future<void> _loadDetail() async {
     setState(() => _isLoading = true);
     try {
       final apiClient = ref.read(apiClientProvider);
-      final json = await apiClient.getPlanDetail(widget.planId);
+      final data = await apiClient.getPlanDetail(widget.planId);
       if (!mounted) return;
       setState(() {
-        _data = PlanDetailResponse.fromJson(json);
+        _data = PlanDetailResponse.fromJson(data);
         _isLoading = false;
       });
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('获取详情失败: $e')));
+      final l10n = AppLocalizations.of(context)!;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l10n.tip_fetch_failed(e.toString()))),
+      );
       setState(() => _isLoading = false);
     }
   }
 
-  Future<void> _armPlan() async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('确认武装计划？'),
-        content: const Text('武装后关键字段将锁定。后续修改将以“修订记录”形式保存，不会改写原始计划。'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('取消'),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('确认武装'),
-          ),
-        ],
-      ),
-    );
-
-    if (confirmed != true) return;
-
+  Future<void> _armPlan(String planId) async {
+    final l10n = AppLocalizations.of(context)!;
     try {
       final apiClient = ref.read(apiClientProvider);
-      await apiClient.armPlan(widget.planId);
-      if (!mounted) return;
-      _fetchDetail();
-    } catch (e) {
+      await apiClient.armPlan(planId);
       if (!mounted) return;
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text('武装失败: $e')));
+      ).showSnackBar(SnackBar(content: Text(l10n.status_armed)));
+      _loadDetail();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l10n.tip_fetch_failed(e.toString()))),
+      );
     }
   }
 
-  Future<void> _reviseTarget() async {
-    final lowController = TextEditingController(
-      text: _data!.plan.targetLow.toString(),
-    );
-    final highController = TextEditingController(
-      text: _data!.plan.targetHigh.toString(),
-    );
-
+  Future<void> _showCloseTradeSheet(PlanDetail plan) async {
     final result = await showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
-      builder: (context) => Padding(
-        padding: EdgeInsets.only(
-          bottom: MediaQuery.of(context).viewInsets.bottom,
-          left: 16,
-          right: 16,
-          top: 16,
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              '修订目标区间',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 16),
-            const Text(
-              '注意：修订不会改写原计划，仅作为调整记录。',
-              style: TextStyle(color: Colors.orange, fontSize: 12),
-            ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: lowController,
-              decoration: const InputDecoration(
-                labelText: '新目标低位',
-                border: OutlineInputBorder(),
-              ),
-              keyboardType: const TextInputType.numberWithOptions(
-                decimal: true,
-              ),
-            ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: highController,
-              decoration: const InputDecoration(
-                labelText: '新目标高位',
-                border: OutlineInputBorder(),
-              ),
-              keyboardType: const TextInputType.numberWithOptions(
-                decimal: true,
-              ),
-            ),
-            const SizedBox(height: 24),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: () => Navigator.pop(context, true),
-                child: const Text('提交修订'),
-              ),
-            ),
-            const SizedBox(height: 16),
-          ],
-        ),
-      ),
+      builder: (context) => _CloseTradeSheet(planId: plan.id),
     );
-
     if (result == true) {
-      try {
-        final apiClient = ref.read(apiClientProvider);
-        await apiClient.updatePlan(widget.planId, {
-          'target_low': double.parse(lowController.text),
-          'target_high': double.parse(highController.text),
-        });
-        if (!mounted) return;
-        _fetchDetail();
-      } catch (e) {
-        if (!mounted) return;
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('修订失败: $e')));
-      }
+      _loadDetail();
     }
   }
 
-  void _showAddEventSheet() {
-    if (_data == null) return;
-    final isClosed = _data!.result != null || _data!.plan.status == 'closed';
-    if (isClosed) return;
-
-    showModalBottomSheet(
+  Future<void> _showAddEventSheet(String planId) async {
+    await showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       builder: (context) =>
-          AddEventSheet(planId: widget.planId, onSuccess: _fetchDetail),
+          AddEventSheet(planId: planId, onSuccess: () => _loadDetail()),
     );
   }
 
-  void _showCloseTradeSheet() {
-    showModalBottomSheet(
+  Future<void> _showReviseTargetSheet(PlanDetail plan) async {
+    await showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      builder: (context) => CloseTradeSheet(
-        planId: widget.planId,
-        status: _data!.plan.status,
-        onSuccess: _fetchDetail,
-      ),
+      builder: (context) =>
+          ReviseTargetSheet(plan: plan, onSuccess: () => _loadDetail()),
     );
-  }
-
-  Future<void> _unarchivePlan() async {
-    try {
-      final apiClient = ref.read(apiClientProvider);
-      await apiClient.unarchivePlan(widget.planId);
-      if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('已取消归档')));
-      _fetchDetail();
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('操作失败: $e')));
-    }
-  }
-
-  Future<void> _goToSelfAssessment() async {
-    if (_data == null) return;
-
-    // Check if already has a review
-    final apiClient = ref.read(apiClientProvider);
-    try {
-      final reviewJson = await apiClient.getSelfReview(widget.planId);
-
-      if (!mounted) return;
-
-      if (reviewJson != null) {
-        final review = SelfReview.fromJson(reviewJson);
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => SelfAssessmentPage(
-              planId: widget.planId,
-              isReadOnly: true,
-              initialScores: review.scores,
-            ),
-          ),
-        );
-      } else {
-        final result = await Navigator.push<bool>(
-          context,
-          MaterialPageRoute(
-            builder: (context) =>
-                SelfAssessmentPage(planId: widget.planId, isReadOnly: false),
-          ),
-        );
-        if (result == true) {
-          _fetchDetail();
-        }
-      }
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('获取评估失败: $e')));
-    }
   }
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     if (_isLoading) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+      return Scaffold(
+        appBar: AppBar(title: Text(l10n.title_plan_detail)),
+        body: const Center(child: CircularProgressIndicator()),
+      );
     }
+
     if (_data == null) {
       return Scaffold(
-        appBar: AppBar(),
-        body: const Center(child: Text('加载失败')),
+        appBar: AppBar(title: Text(l10n.title_plan_detail)),
+        body: Center(child: Text(l10n.tip_no_plans)),
       );
     }
 
     final plan = _data!.plan;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('计划详情')),
-      body: RefreshIndicator(
-        onRefresh: _fetchDetail,
-        child: ListView(
-          padding: const EdgeInsets.all(16),
+      appBar: AppBar(
+        title: Text('${plan.symbolCode} ${l10n.title_plan_detail}'),
+      ),
+      body: SingleChildScrollView(
+        child: Column(
           children: [
-            _buildSummaryCard(plan),
-            const SizedBox(height: 16),
-            _buildOriginalPlanCard(plan),
-            const SizedBox(height: 16),
-            PlanCompareCard(plan: plan, events: _data!.events),
-            const SizedBox(height: 16),
-            EventsTimelineCard(
-              events: _data!.events,
-              onAddEvent: _showAddEventSheet,
-              isReadOnly:
-                  _data!.result != null || _data!.plan.status == 'closed',
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                children: [
+                  _buildSummaryCard(context, plan),
+                  const SizedBox(height: 16),
+                  if (_data!.result != null) ...[
+                    ResultCard(result: _data!.result!),
+                    const SizedBox(height: 16),
+                  ],
+                  _buildOriginalPlanCard(context, plan),
+                  const SizedBox(height: 16),
+                  PlanCompareCard(plan: plan, events: _data!.events),
+                  const SizedBox(height: 16),
+                  EventsTimelineCard(
+                    events: _data!.events,
+                    onAddEvent: () => _showAddEventSheet(plan.id),
+                    isReadOnly: plan.status == 'closed',
+                  ),
+                  const SizedBox(height: 24),
+                  _buildActionArea(context, plan),
+                  if (_data!.edits.isNotEmpty) ...[
+                    const SizedBox(height: 24),
+                    _buildEditsList(context, _data!.edits),
+                  ],
+                ],
+              ),
             ),
-            const SizedBox(height: 16),
-            if (_data!.result != null) ...[
-              ResultCard(result: _data!.result!),
-              const SizedBox(height: 16),
-            ],
-            if (_data!.plan.status == 'closed') ...[
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton.icon(
-                  onPressed: _goToSelfAssessment,
-                  icon: const Icon(Icons.assignment_outlined),
-                  label: const Text(
-                    '自我评估 (13维)',
-                    style: TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                  style: ElevatedButton.styleFrom(
-                    padding: const EdgeInsets.all(16),
-                    backgroundColor: Theme.of(
-                      context,
-                    ).colorScheme.primaryContainer,
-                    foregroundColor: Theme.of(
-                      context,
-                    ).colorScheme.onPrimaryContainer,
-                    elevation: 1,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-            ] else ...[
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton.icon(
-                  onPressed: _showCloseTradeSheet,
-                  icon: const Icon(Icons.check_circle_outline),
-                  label: const Text(
-                    '结束交易（卖出）',
-                    style: TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                  style: ElevatedButton.styleFrom(
-                    padding: const EdgeInsets.all(16),
-                    backgroundColor: Colors.redAccent,
-                    foregroundColor: Colors.white,
-                    elevation: 2,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-            ],
-            _buildActionArea(plan),
-            const SizedBox(height: 16),
-            _buildEditsList(_data!.edits),
             const SizedBox(height: 40),
           ],
         ),
@@ -344,37 +161,56 @@ class _PlanDetailPageState extends ConsumerState<PlanDetailPage> {
     );
   }
 
-  Widget _buildSummaryCard(PlanDetail plan) {
-    return Card(
+  Widget _buildSummaryCard(BuildContext context, PlanDetail plan) {
+    final l10n = AppLocalizations.of(context)!;
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.card,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.border, width: 1),
+        boxShadow: AppTheme.softShadow,
+      ),
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
-                  '${plan.symbolCode} ${plan.symbolName}',
-                  style: const TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
+                Expanded(
+                  child: Text(
+                    '${plan.symbolCode} ${plan.symbolName}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.textMain,
+                    ),
                   ),
                 ),
-                _buildStatusBadge(plan),
+                _buildStatusBadge(context, plan),
               ],
             ),
             const SizedBox(height: 4),
             Text(
               plan.symbolIndustry,
-              style: const TextStyle(color: Colors.grey),
+              style: const TextStyle(
+                color: AppColors.textSecondary,
+                fontSize: 13,
+              ),
             ),
-            const Divider(height: 24),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 16),
+              child: Divider(),
+            ),
+            Wrap(
+              spacing: 24,
+              runSpacing: 8,
               children: [
-                _buildTimeInfo('创建', plan.createdAt),
-                _buildTimeInfo('更新', plan.updatedAt),
+                _buildTimeInfo(context, l10n.label_create, plan.createdAt),
+                _buildTimeInfo(context, l10n.label_update, plan.updatedAt),
               ],
             ),
           ],
@@ -383,18 +219,35 @@ class _PlanDetailPageState extends ConsumerState<PlanDetailPage> {
     );
   }
 
-  Widget _buildStatusBadge(PlanDetail plan) {
+  Widget _buildStatusBadge(BuildContext context, PlanDetail plan) {
+    final l10n = AppLocalizations.of(context)!;
+    String display;
+    switch (plan.status) {
+      case 'draft':
+        display = l10n.status_draft;
+        break;
+      case 'armed':
+        display = l10n.status_armed;
+        break;
+      case 'holding':
+        display = l10n.status_holding;
+        break;
+      case 'closed':
+        display = l10n.status_closed;
+        break;
+      default:
+        display = plan.statusDisplay;
+    }
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        color: _getStatusColor(plan.status).withValues(alpha: 0.1),
+        color: _getStatusColor(plan.status).withAlpha(25),
         borderRadius: BorderRadius.circular(4),
-        border: Border.all(
-          color: _getStatusColor(plan.status).withValues(alpha: 0.4),
-        ),
+        border: Border.all(color: _getStatusColor(plan.status).withAlpha(128)),
       ),
       child: Text(
-        plan.statusDisplay,
+        display,
         style: TextStyle(
           color: _getStatusColor(plan.status),
           fontSize: 12,
@@ -404,180 +257,224 @@ class _PlanDetailPageState extends ConsumerState<PlanDetailPage> {
     );
   }
 
-  Widget _buildTimeInfo(String label, int timestamp) {
+  Widget _buildTimeInfo(BuildContext context, String label, int timestamp) {
     final dateStr = DateFormat(
       'MM-dd HH:mm',
     ).format(DateTime.fromMillisecondsSinceEpoch(timestamp * 1000));
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: const TextStyle(fontSize: 10, color: Colors.grey)),
-        Text(dateStr, style: const TextStyle(fontSize: 12)),
+        Text(
+          label,
+          style: const TextStyle(fontSize: 11, color: AppColors.textWeak),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          dateStr,
+          style: const TextStyle(fontSize: 13, color: AppColors.textSecondary),
+        ),
       ],
     );
   }
 
-  Widget _buildOriginalPlanCard(PlanDetail plan) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    return Card(
-      color: isDark
-          ? Colors.white.withValues(alpha: 0.05)
-          : Colors.blueGrey.withValues(alpha: 0.05),
-      shape: RoundedRectangleBorder(
+  Widget _buildOriginalPlanCard(BuildContext context, PlanDetail plan) {
+    final l10n = AppLocalizations.of(context)!;
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.secondaryBlock,
         borderRadius: BorderRadius.circular(12),
-        side: BorderSide(
-          color: isDark
-              ? Colors.white.withValues(alpha: 0.1)
-              : Colors.blueGrey.withValues(alpha: 0.1),
-        ),
+        border: Border.all(color: AppColors.border, width: 1),
       ),
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Row(
+            Row(
               children: [
-                Icon(Icons.lock_outline, size: 16, color: Colors.blueGrey),
-                SizedBox(width: 8),
+                const Icon(
+                  Icons.lock_outline,
+                  size: 16,
+                  color: AppColors.textWeak,
+                ),
+                const SizedBox(width: 8),
                 Text(
-                  '原始计划 (锁定内容)',
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    color: Colors.blueGrey,
+                  l10n.label_original_plan,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.textSecondary,
+                    fontSize: 14,
                   ),
                 ),
               ],
             ),
             const SizedBox(height: 16),
-            _buildDetailRow('买入理由', plan.buyReasonText),
-            _buildDetailRow('理由类型', plan.buyReasonTypes.join(', ')),
+            _buildDetailRow(context, l10n.label_buy_reason, plan.buyReasonText),
             _buildDetailRow(
-              '目标区间',
+              context,
+              l10n.label_reason_type,
+              plan.buyReasonTypes.join(', '),
+            ),
+            _buildDetailRow(
+              context,
+              l10n.label_target_range,
               '${plan.targetLow} ~ ${plan.targetHigh} (${plan.targetType})',
             ),
-            _buildDetailRow('卖出逻辑', plan.sellConditions.join(', ')),
-            if (plan.timeTakeProfitDays != null)
-              _buildDetailRow('时间止盈', '${plan.timeTakeProfitDays} 天'),
             _buildDetailRow(
-              '止损逻辑',
+              context,
+              l10n.label_sell_logic,
+              plan.sellConditions.join(', '),
+            ),
+            if (plan.timeTakeProfitDays != null)
+              _buildDetailRow(
+                context,
+                l10n.label_time_take_profit,
+                '${plan.timeTakeProfitDays} 天',
+              ),
+            _buildDetailRow(
+              context,
+              l10n.label_stop_logic,
               '${plan.stopType}: ${plan.stopValue ?? plan.stopTimeDays ?? "-"}',
             ),
             if (plan.entryPrice != null)
-              _buildDetailRow('预期买入价', plan.entryPrice.toString()),
+              _buildDetailRow(
+                context,
+                l10n.label_entry_price,
+                plan.entryPrice.toString(),
+              ),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildDetailRow(String label, String value) {
+  Widget _buildDetailRow(BuildContext context, String label, String value) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.only(bottom: 10),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          SizedBox(
-            width: 80,
+          ConstrainedBox(
+            constraints: const BoxConstraints(minWidth: 72, maxWidth: 120),
             child: Text(
               label,
-              style: const TextStyle(color: Colors.grey, fontSize: 13),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(color: AppColors.textWeak, fontSize: 13),
             ),
           ),
-          Expanded(child: Text(value, style: const TextStyle(fontSize: 13))),
+          Expanded(
+            child: Text(
+              value,
+              style: const TextStyle(
+                fontSize: 13,
+                color: AppColors.textSecondary,
+              ),
+            ),
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildActionArea(PlanDetail plan) {
-    final isClosed = _data!.result != null || plan.status == 'closed';
-    if (isClosed) {
-      if (plan.isArchived) {
-        return SizedBox(
-          width: double.infinity,
-          child: ElevatedButton.icon(
-            onPressed: _unarchivePlan,
-            icon: const Icon(Icons.unarchive_outlined),
-            label: const Text('取消归档'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.blueGrey,
-              foregroundColor: Colors.white,
-            ),
-          ),
-        );
-      }
-      return const SizedBox.shrink();
-    }
-
-    if (plan.status == 'draft') {
+  Widget _buildActionArea(BuildContext context, PlanDetail plan) {
+    final l10n = AppLocalizations.of(context)!;
+    if (plan.status == 'closed') {
       return SizedBox(
         width: double.infinity,
-        child: ElevatedButton(
-          onPressed: _armPlan,
-          style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.blue,
-            foregroundColor: Colors.white,
-            padding: const EdgeInsets.all(16),
-          ),
-          child: const Text(
-            '确认并进入已武装 (Armed)',
-            style: TextStyle(fontWeight: FontWeight.bold),
-          ),
+        height: 50,
+        child: ElevatedButton.icon(
+          onPressed: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => SelfAssessmentPage(planId: plan.id),
+              ),
+            );
+          },
+          icon: const Icon(Icons.assignment_outlined),
+          label: Text(l10n.action_self_assessment),
         ),
       );
-    } else {
-      return Column(
-        children: [
-          const Text(
-            '计划已锁定；后续调整会以“修订记录”形式保存。',
-            style: TextStyle(color: Colors.grey, fontSize: 12),
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
+    }
+
+    return Column(
+      children: [
+        Row(
+          children: [
+            if (plan.status == 'draft')
               Expanded(
-                child: ElevatedButton.icon(
-                  onPressed: _reviseTarget,
-                  icon: const Icon(Icons.edit_location_alt_outlined),
-                  label: const Text('修订目标区间'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor:
-                        Theme.of(context).brightness == Brightness.dark
-                        ? Colors.blueGrey[800]
-                        : Colors.blueGrey[50],
-                    foregroundColor:
-                        Theme.of(context).brightness == Brightness.dark
-                        ? Colors.white
-                        : Colors.blueGrey[800],
+                child: SizedBox(
+                  height: 50,
+                  child: ElevatedButton.icon(
+                    onPressed: () => _armPlan(plan.id),
+                    icon: const Icon(Icons.security),
+                    label: Text(l10n.action_arm),
                   ),
                 ),
               ),
-            ],
+            if (plan.status == 'armed' || plan.status == 'holding')
+              Expanded(
+                child: SizedBox(
+                  height: 50,
+                  child: ElevatedButton.icon(
+                    onPressed: () => _showCloseTradeSheet(plan),
+                    icon: const Icon(Icons.check_circle_outline),
+                    label: Text(
+                      l10n.action_close_trade,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.redAccent,
+                      foregroundColor: Colors.white,
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        ),
+        if (plan.status == 'armed' || plan.status == 'holding') ...[
+          const SizedBox(height: 16),
+          Text(
+            l10n.tip_plan_locked,
+            style: const TextStyle(fontSize: 12, color: AppColors.textWeak),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            height: 50,
+            child: OutlinedButton.icon(
+              onPressed: () => _showReviseTargetSheet(plan),
+              icon: const Icon(Icons.track_changes),
+              label: Text(
+                l10n.action_revise_target,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+              style: OutlinedButton.styleFrom(
+                side: const BorderSide(color: AppColors.border),
+                foregroundColor: AppColors.textSecondary,
+              ),
+            ),
           ),
         ],
-      );
-    }
+      ],
+    );
   }
 
-  Widget _buildEditsList(List<PlanEdit> edits) {
+  Widget _buildEditsList(BuildContext context, List<PlanEdit> edits) {
+    final l10n = AppLocalizations.of(context)!;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          '修订记录',
-          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+        Text(
+          l10n.label_edit_history,
+          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
         ),
         const SizedBox(height: 12),
-        if (edits.isEmpty)
-          const Center(
-            child: Padding(
-              padding: EdgeInsets.all(24.0),
-              child: Text('暂无修订记录', style: TextStyle(color: Colors.grey)),
-            ),
-          )
-        else
-          ...edits.map((edit) => _buildEditItem(edit)),
+        ...edits.map((edit) => _buildEditItem(edit)),
       ],
     );
   }
@@ -586,14 +483,13 @@ class _PlanDetailPageState extends ConsumerState<PlanDetailPage> {
     final dateStr = DateFormat(
       'MM-dd HH:mm',
     ).format(DateTime.fromMillisecondsSinceEpoch(edit.editedAt * 1000));
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.orange.withValues(alpha: isDark ? 0.1 : 0.05),
+        color: AppColors.secondaryBlock,
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: Colors.orange.withValues(alpha: 0.3)),
+        border: Border.all(color: AppColors.border),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -606,19 +502,22 @@ class _PlanDetailPageState extends ConsumerState<PlanDetailPage> {
                 style: const TextStyle(
                   fontWeight: FontWeight.bold,
                   fontSize: 13,
-                  color: Colors.orange,
+                  color: AppColors.textMain,
                 ),
               ),
               Text(
                 dateStr,
-                style: const TextStyle(fontSize: 11, color: Colors.grey),
+                style: const TextStyle(fontSize: 11, color: AppColors.textWeak),
               ),
             ],
           ),
           const SizedBox(height: 4),
           Text(
             '${edit.oldValue} -> ${edit.newValue}',
-            style: const TextStyle(fontSize: 12, fontFamily: 'monospace'),
+            style: const TextStyle(
+              fontSize: 12,
+              color: AppColors.textSecondary,
+            ),
           ),
         ],
       ),
@@ -637,6 +536,111 @@ class _PlanDetailPageState extends ConsumerState<PlanDetailPage> {
         return Colors.green;
       default:
         return Colors.grey;
+    }
+  }
+}
+
+class _CloseTradeSheet extends StatefulWidget {
+  final String planId;
+  const _CloseTradeSheet({required this.planId});
+
+  @override
+  State<_CloseTradeSheet> createState() => _CloseTradeSheetState();
+}
+
+class _CloseTradeSheetState extends State<_CloseTradeSheet> {
+  final _priceController = TextEditingController();
+  final _reasonController = TextEditingController();
+  bool _isSubmitting = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    return SafeArea(
+      child: SingleChildScrollView(
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.of(context).viewInsets.bottom + 20,
+          left: 20,
+          right: 20,
+          top: 20,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              l10n.action_close_trade,
+              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 20),
+            TextField(
+              controller: _priceController,
+              decoration: InputDecoration(
+                labelText: l10n.label_close_price,
+                hintText: l10n.hint_close_price,
+              ),
+              keyboardType: const TextInputType.numberWithOptions(
+                decimal: true,
+              ),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: _reasonController,
+              decoration: InputDecoration(
+                labelText: l10n.label_close_reason,
+                hintText: l10n.hint_close_reason,
+              ),
+              maxLines: 3,
+            ),
+            const SizedBox(height: 24),
+            SizedBox(
+              width: double.infinity,
+              height: 50,
+              child: ElevatedButton(
+                onPressed: _isSubmitting ? null : _submit,
+                child: _isSubmitting
+                    ? const CircularProgressIndicator(color: Colors.white)
+                    : Text(l10n.action_close_trade),
+              ),
+            ),
+            const SizedBox(height: 20),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _submit() async {
+    final l10n = AppLocalizations.of(context)!;
+    final price = double.tryParse(_priceController.text);
+    if (price == null) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(l10n.tip_invalid_price)));
+      return;
+    }
+
+    setState(() => _isSubmitting = true);
+    try {
+      final container = ProviderScope.containerOf(context);
+      final apiClient = container.read(apiClientProvider);
+      await apiClient.closePlan(
+        widget.planId,
+        ClosePlanRequest(sellPrice: price, sellReason: _reasonController.text),
+      );
+      if (mounted) {
+        Navigator.pop(context, true);
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(l10n.tip_submit_failed(e.toString()))),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isSubmitting = false);
+      }
     }
   }
 }

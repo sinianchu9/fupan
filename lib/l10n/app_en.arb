@@ -1,0 +1,218 @@
+{
+  "@@locale": "en",
+  "title_journal": "Trading Journal",
+  "title_plan_detail": "Plan Detail",
+  "title_self_assessment": "Self Assessment",
+  "title_weekly_report": "Weekly Discipline Report",
+  "title_create_plan": "Create Plan",
+  "title_archived_plans": "Archived Plans",
+  "title_login": "Login",
+
+  "status_draft": "Draft",
+  "status_armed": "Armed",
+  "status_holding": "Holding",
+  "status_closed": "Closed",
+  "status_archived": "Archived",
+
+  "action_create_plan": "New Plan",
+  "action_submit": "Submit Assessment",
+  "action_arm": "Arm Plan",
+  "action_close_trade": "Close Trade",
+  "action_self_assessment": "Self Assessment",
+  "action_archive": "Archive",
+  "action_unarchive": "Unarchive",
+  "action_refresh": "Refresh",
+  "action_view_detail": "View Details",
+  "action_hide_details": "Hide Details",
+  "action_back": "Back",
+  "action_confirm": "Confirm",
+  "action_add": "Add",
+  "action_switch_language": "Switch Language",
+  "tip_required": "Required",
+
+  "label_language_zh": "简体中文",
+  "label_language_en": "English",
+
+  "label_discipline_score": "Weekly Discipline Score",
+  "label_symbol": "Symbol",
+  "label_industry": "Industry",
+  "label_updated_at": "Updated At",
+  "label_pcs_score": "1️⃣ Plan Consistency Score (PCS)",
+  "label_main_deviation": "2️⃣ Main Deviation Type",
+  "label_conclusion": "3️⃣ Calm Conclusion",
+  "label_tnr_ldc": "4️⃣ TNR / LDC",
+  "label_completed_count": "Completed {count}/13",
+  "@label_completed_count": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+
+  "tip_no_plans": "No trading plans yet",
+  "tip_no_plans_sub": "Plan first, trade later to strengthen discipline",
+  "tip_no_trades": "No trading records this week",
+  "tip_fetch_failed": "Failed to fetch data: {error}",
+  "@tip_fetch_failed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "tip_submit_success": "Assessment submitted successfully",
+  "tip_submit_failed": "Submission failed: {error}",
+  "@tip_submit_failed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "tip_complete_all": "Please complete all dimensions",
+  "label_buy_reason": "Buy Reason",
+  "label_reason_type": "Reason Type",
+  "label_target_range": "Target Range",
+  "label_sell_logic": "Sell Logic",
+  "label_time_take_profit": "Time Take Profit",
+  "label_stop_logic": "Stop Logic",
+  "label_entry_price": "Entry Price",
+  "label_edit_history": "Edit History",
+  "label_close_price": "Close Price",
+  "label_close_reason": "Close Reason",
+  "hint_close_price": "Enter close price",
+  "hint_close_reason": "Briefly describe close logic",
+  "label_create": "Create",
+  "label_update": "Update",
+  "label_original_plan": "Original Plan (Locked)",
+  "deviation_no_plan": "No Plan Trade",
+  "deviation_emotion_override": "Emotion Override",
+  "deviation_forced": "Forced Disturbance",
+  "deviation_none": "No Deviation",
+  "deviation_no_trades": "No Trades",
+  "label_no_trades": "No Trades",
+  "label_none": "None",
+  "label_not_applicable": "N/A",
+  "title_create_plan": "New Trade Plan",
+  "action_save_draft": "Save Draft",
+  "label_symbol_selection": "Symbol Selection",
+  "label_buy_reason_one_liner": "One-liner Reason",
+  "hint_buy_reason_one_liner": "In plain words (max 50 chars)",
+  "label_target_sell_price": "Expected Sell Target",
+  "label_target_low": "Target Low",
+  "label_target_high": "Target High",
+  "label_sell_logic_expected": "Expected Sell Logic",
+  "label_time_take_profit_days": "Time Take Profit Days",
+  "label_stop_loss_logic": "Stop Loss Logic",
+  "label_stop_price": "Stop Price",
+  "label_stop_days": "Stop Days",
+  "label_max_loss_percent": "Max Loss (%)",
+  "hint_max_loss": "e.g. 5 means 5%",
+  "label_advanced_options": "Advanced Options",
+  "label_expected_entry_price": "Expected Entry Price (Optional)",
+  "label_trade_direction": "Trade Direction",
+  "label_long": "Long",
+  "label_short": "Short",
+  "tip_select_buy_reason": "Please select at least one buy reason type",
+  "tip_select_sell_logic": "Please select at least one sell logic",
+  "tip_watchlist_empty": "Watchlist is empty, please add symbols first",
+  "tip_greater_than_low": "Must be greater than low",
+  "tip_greater_than_zero": "Must be >= 1",
+  "tip_invalid_loss_percent": "Please enter 1~100",
+  "tip_invalid_price": "Please enter a valid close price",
+  "reason_trend": "Trend",
+  "reason_range": "Range",
+  "reason_policy": "Policy",
+  "reason_industry": "Industry",
+  "reason_earnings": "Earnings",
+  "reason_sentiment": "Sentiment",
+  "reason_probe": "Probe",
+  "reason_other": "Other",
+  "target_technical": "Technical",
+  "target_previous_high": "Prev High",
+  "target_event": "Event",
+  "target_trend": "Trend",
+  "logic_reach_target": "Reach Target",
+  "logic_volume_exhaust": "Vol Exhaust",
+  "logic_trend_break": "Trend Break",
+  "logic_thesis_invalidated": "Thesis Invalid",
+  "logic_time_take_profit": "Time TP",
+  "stop_technical": "Technical",
+  "stop_time": "Time",
+  "stop_logic_fail": "Logic Fail",
+  "stop_max_loss": "Max Loss",
+  "label_welcome_back": "Welcome Back",
+  "tip_enter_email": "Enter your email to get verification code",
+  "label_email": "Email",
+  "hint_email": "Enter your email address",
+  "action_send_otp": "Send Code",
+  "tip_invalid_email": "Please enter a valid email address",
+  "tip_send_otp_failed": "Failed to send code, please try again",
+  "title_verify_otp": "Verification",
+  "tip_otp_sent_to": "Verification code sent to {email}",
+  "label_otp": "Verification Code",
+  "action_verify": "Verify",
+  "tip_invalid_otp": "Please enter 6-digit code",
+  "tip_verify_failed": "Verification failed, please check the code",
+  "action_back_to_edit_email": "Back to edit email",
+  "label_all_statuses": "All Statuses",
+  "tip_no_archived_plans": "No archived plans",
+  "action_unarchive": "Unarchive",
+  "tip_unarchived_success": "Unarchived successfully",
+  "label_target_range_with_values": "Target: {low} ~ {high}",
+  "label_direction_with_value": "Direction: {direction}",
+  "title_manage_watchlist": "Manage Watchlist",
+  "title_select_watchlist": "Select Your Watchlist",
+  "tip_add_at_least_one": "Please add at least 1 stock to get started",
+  "hint_search_symbol": "Enter code/name/industry",
+  "label_all_industries": "All Industries",
+  "tip_symbol_not_found": "No matching stocks found",
+  "action_seed_data": "Seed Test Data",
+  "tip_added_symbol": "Added {name}",
+  "label_added": "Added",
+  "action_enter_app": "Enter App",
+  "title_subscription_limit": "Subscription Limit",
+  "tip_subscription_limit_msg": "Free version can only add 1 stock. Please upgrade to unlock more slots.",
+  "action_learn_more_upgrade": "Learn More & Upgrade",
+  "tip_seed_success": "Test data seeded successfully, please search again",
+  "tip_seed_failed": "Seed failed: {error}\nPlease ensure you have run npx wrangler d1 execute ... to initialize the database",
+  "label_nav_journal": "Journal",
+  "label_nav_alerts": "Alerts",
+  "label_nav_stats": "Stats",
+  "tip_alerts_placeholder": "Alerts (Step 4 Implementation)",
+  "tip_plan_locked": "Plan locked; subsequent adjustments will be saved as 'Revision Records'.",
+  "action_revise_target": "Revise Target Range",
+  "title_revise_target": "Revise Target Range",
+  "label_event_timeline": "Event Timeline",
+  "action_add_event": "Add Event",
+  "label_comparison_status": "Comparison Status",
+  "label_fact_only": "Facts only, no advice provided",
+  "label_defined": "Defined",
+  "label_undefined": "Undefined",
+  "label_exit_trigger_event": "Exit Trigger Event",
+  "label_yes_with_count": "Yes ({count})",
+  "@label_yes_with_count": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "tip_exit_event_recorded": "{count} events recorded as 'Trigger Exit Condition'. Please select a reason when selling and complete the comparison review.",
+  "@tip_exit_event_recorded": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "label_time_take_profit_condition": "• Time Take Profit: {days} days (from plan creation)",
+  "@label_time_take_profit_condition": {
+    "placeholders": {
+      "days": {
+        "type": "int"
+      }
+    }
+  }
+}

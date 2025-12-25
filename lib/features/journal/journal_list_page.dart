@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+import 'package:fupan/l10n/generated/app_localizations.dart';
 import '../../core/providers.dart';
+import '../../core/locale_provider.dart';
+import '../../core/theme.dart';
 import '../../models/plan_list_item.dart';
 import 'create_plan_page.dart';
 import 'plan_detail_page.dart';
@@ -17,7 +20,6 @@ class JournalListPage extends ConsumerStatefulWidget {
 class _JournalListPageState extends ConsumerState<JournalListPage> {
   bool _isLoading = false;
   List<PlanListItem> _plans = [];
-  int _watchlistCount = 0;
 
   @override
   void initState() {
@@ -29,26 +31,20 @@ class _JournalListPageState extends ConsumerState<JournalListPage> {
     setState(() => _isLoading = true);
     try {
       final apiClient = ref.read(apiClientProvider);
-
-      // 并行拉取 watchlist 数量和计划列表
-      final results = await Future.wait([
-        apiClient.getWatchlist(),
-        apiClient.getPlans(),
-      ]);
+      final planItems = await apiClient.getPlans();
 
       if (!mounted) return;
-      final watchlistItems = results[0] as List;
-      final planItems = results[1] as List;
-
       setState(() {
-        _watchlistCount = watchlistItems.length;
-        _plans = planItems.map((e) => PlanListItem.fromJson(e)).toList();
+        _plans = (planItems as List)
+            .map((e) => PlanListItem.fromJson(e))
+            .toList();
       });
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('获取数据失败: $e')));
+      final l10n = AppLocalizations.of(context)!;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l10n.tip_fetch_failed(e.toString()))),
+      );
     } finally {
       if (mounted) {
         setState(() => _isLoading = false);
@@ -56,19 +52,93 @@ class _JournalListPageState extends ConsumerState<JournalListPage> {
     }
   }
 
+  void _showLanguageSheet(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context)!;
+    final currentLocale = ref.read(localeProvider);
+
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (context) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 8,
+                  ),
+                  child: Text(
+                    l10n.action_switch_language,
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+                const Divider(),
+                ListTile(
+                  leading: const Text('🇨🇳', style: TextStyle(fontSize: 24)),
+                  title: Text(l10n.label_language_zh),
+                  trailing: currentLocale?.languageCode == 'zh'
+                      ? const Icon(Icons.check, color: Colors.green)
+                      : null,
+                  onTap: () {
+                    ref
+                        .read(localeProvider.notifier)
+                        .setLocale(const Locale('zh'));
+                    Navigator.pop(context);
+                  },
+                ),
+                ListTile(
+                  leading: const Text('🇺🇸', style: TextStyle(fontSize: 24)),
+                  title: Text(l10n.label_language_en),
+                  trailing: currentLocale?.languageCode == 'en'
+                      ? const Icon(Icons.check, color: Colors.green)
+                      : null,
+                  onTap: () {
+                    ref
+                        .read(localeProvider.notifier)
+                        .setLocale(const Locale('en'));
+                    Navigator.pop(context);
+                  },
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+
     return Scaffold(
       appBar: AppBar(
-        title: const Text('交易复盘'),
+        title: Text(l10n.title_journal),
         actions: [
+          // Language switch button
+          IconButton(
+            icon: const Icon(Icons.language),
+            tooltip: l10n.action_switch_language,
+            onPressed: () => _showLanguageSheet(context, ref),
+          ),
           IconButton(
             icon: const Icon(Icons.archive_outlined),
-            tooltip: '已归档计划',
+            tooltip: l10n.title_archived_plans,
             onPressed: () {
               Navigator.push(
                 context,
-                MaterialPageRoute(builder: (context) => const ArchivedPlansPage()),
+                MaterialPageRoute(
+                  builder: (context) => const ArchivedPlansPage(),
+                ),
               ).then((_) => _refresh());
             },
           ),
@@ -80,30 +150,61 @@ class _JournalListPageState extends ConsumerState<JournalListPage> {
           children: [
             // 顶部信息条
             Container(
-              padding: const EdgeInsets.all(16),
-              color: Theme.of(
-                context,
-              ).colorScheme.surfaceContainerHighest.withAlpha(76),
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+              decoration: const BoxDecoration(
+                color: AppColors.card,
+                border: Border(
+                  bottom: BorderSide(color: AppColors.border, width: 1),
+                ),
+              ),
               child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(
-                    '已关注 $_watchlistCount 只股票',
-                    style: const TextStyle(color: Colors.grey),
-                  ),
-                  ElevatedButton.icon(
-                    onPressed: () async {
-                      final result = await Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (context) => const CreatePlanPage(),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          l10n.label_discipline_score,
+                          style: const TextStyle(
+                            color: AppColors.textSecondary,
+                            fontSize: 12,
+                          ),
                         ),
-                      );
-                      if (result == true) {
-                        _refresh();
-                      }
-                    },
-                    icon: const Icon(Icons.add),
-                    label: const Text('新建计划'),
+                        const SizedBox(height: 4),
+                        const Text(
+                          '85.5',
+                          style: TextStyle(
+                            color: AppColors.goldMain,
+                            fontSize: 24,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: -0.5,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Flexible(
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(minHeight: 40),
+                      child: ElevatedButton.icon(
+                        onPressed: () async {
+                          final result = await Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (context) => const CreatePlanPage(),
+                            ),
+                          );
+                          if (result == true) {
+                            _refresh();
+                          }
+                        },
+                        icon: const Icon(Icons.add, size: 18),
+                        label: Text(
+                          l10n.action_create_plan,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ),
                   ),
                 ],
               ),
@@ -119,21 +220,21 @@ class _JournalListPageState extends ConsumerState<JournalListPage> {
                         SizedBox(
                           height: MediaQuery.of(context).size.height * 0.2,
                         ),
-                        const Center(
+                        Center(
                           child: Column(
                             children: [
                               Text(
-                                '还没有交易计划',
-                                style: TextStyle(
+                                l10n.tip_no_plans,
+                                style: const TextStyle(
                                   color: Colors.grey,
                                   fontSize: 18,
                                   fontWeight: FontWeight.bold,
                                 ),
                               ),
-                              SizedBox(height: 8),
+                              const SizedBox(height: 8),
                               Text(
-                                '先写计划再交易，强化交易纪律',
-                                style: TextStyle(color: Colors.grey),
+                                l10n.tip_no_plans_sub,
+                                style: const TextStyle(color: Colors.grey),
                               ),
                             ],
                           ),
@@ -159,171 +260,129 @@ class _JournalListPageState extends ConsumerState<JournalListPage> {
       'yyyy-MM-dd HH:mm',
     ).format(DateTime.fromMillisecondsSinceEpoch(plan.updatedAt * 1000));
 
-    return Card(
+    return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: InkWell(
-        onTap: () {
-          Navigator.of(context).push(
-            MaterialPageRoute(
-              builder: (context) => PlanDetailPage(planId: plan.id),
-            ),
-          );
-        },
+      decoration: BoxDecoration(
+        color: AppColors.card,
         borderRadius: BorderRadius.circular(12),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          '${plan.symbolCode} ${plan.symbolName}',
-                          style: const TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 16,
+        border: Border.all(color: AppColors.border, width: 1),
+        boxShadow: AppTheme.softShadow,
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () {
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (context) => PlanDetailPage(planId: plan.id),
+              ),
+            );
+          },
+          borderRadius: BorderRadius.circular(12),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            '${plan.symbolCode} ${plan.symbolName}',
+                            style: const TextStyle(
+                              color: AppColors.textMain,
+                              fontWeight: FontWeight.w600,
+                              fontSize: 16,
+                            ),
                           ),
-                        ),
-                        Text(
-                          plan.symbolIndustry,
-                          style: const TextStyle(
-                            color: Colors.grey,
-                            fontSize: 12,
+                          const SizedBox(height: 4),
+                          Text(
+                            plan.symbolIndustry,
+                            style: const TextStyle(
+                              color: AppColors.textSecondary,
+                              fontSize: 12,
+                            ),
                           ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 4,
-                    ),
-                    decoration: BoxDecoration(
-                      color: _getStatusColor(plan.status).withAlpha(25),
-                      borderRadius: BorderRadius.circular(4),
-                      border: Border.all(
-                        color: _getStatusColor(plan.status).withAlpha(128),
+                        ],
                       ),
                     ),
-                    child: Text(
-                      plan.statusDisplay,
-                      style: TextStyle(
-                        color: _getStatusColor(plan.status),
+                    _buildStatusBadge(context, plan.status),
+                  ],
+                ),
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 12),
+                  child: Divider(height: 1),
+                ),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      dateStr,
+                      style: const TextStyle(
+                        color: AppColors.textWeak,
                         fontSize: 12,
-                        fontWeight: FontWeight.bold,
                       ),
                     ),
-                  ),
-                  _buildCardMenu(plan),
-                ],
-              ),
-              const SizedBox(height: 12),
-              Text(
-                plan.buyReasonText,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(fontSize: 14),
-              ),
-              const SizedBox(height: 12),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    '目标区间: ${plan.targetLow} ~ ${plan.targetHigh}',
-                    style: const TextStyle(
-                      fontSize: 12,
-                      color: Colors.blueGrey,
+                    const Icon(
+                      Icons.chevron_right,
+                      size: 16,
+                      color: AppColors.textWeak,
                     ),
-                  ),
-                  Text(
-                    dateStr,
-                    style: const TextStyle(fontSize: 12, color: Colors.grey),
-                  ),
-                ],
-              ),
-            ],
+                  ],
+                ),
+              ],
+            ),
           ),
         ),
       ),
     );
   }
 
-  Widget _buildCardMenu(PlanListItem plan) {
-    return PopupMenuButton<String>(
-      icon: const Icon(Icons.more_vert, size: 20, color: Colors.grey),
-      padding: EdgeInsets.zero,
-      onSelected: (v) {
-        if (v == 'archive') {
-          _archivePlan(plan.id);
-        } else if (v == 'detail') {
-          Navigator.of(context).push(
-            MaterialPageRoute(
-              builder: (context) => PlanDetailPage(planId: plan.id),
-            ),
-          ).then((_) => _refresh());
-        }
-      },
-      itemBuilder: (context) => [
-        const PopupMenuItem(
-          value: 'archive',
-          child: Row(
-            children: [
-              Icon(Icons.archive_outlined, size: 18),
-              SizedBox(width: 8),
-              Text('归档'),
-            ],
-          ),
-        ),
-        const PopupMenuItem(
-          value: 'detail',
-          child: Row(
-            children: [
-              Icon(Icons.description_outlined, size: 18),
-              SizedBox(width: 8),
-              Text('查看详情'),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
-  Future<void> _archivePlan(String planId) async {
-    try {
-      final apiClient = ref.read(apiClientProvider);
-      await apiClient.archivePlan(planId);
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('已归档，可在已归档中查看')),
-      );
-      _refresh();
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('归档失败: $e')),
-      );
-    }
-  }
-
-  Color _getStatusColor(String status) {
+  Widget _buildStatusBadge(BuildContext context, String status) {
+    final l10n = AppLocalizations.of(context)!;
+    Color color;
+    String display;
     switch (status) {
       case 'draft':
-        return Colors.grey;
+        color = Colors.grey;
+        display = l10n.status_draft;
+        break;
       case 'armed':
-        return Colors.blue;
+        color = Colors.blue;
+        display = l10n.status_armed;
+        break;
       case 'holding':
-        return Colors.orange;
+        color = Colors.orange;
+        display = l10n.status_holding;
+        break;
       case 'closed':
-        return Colors.green;
+        color = Colors.green;
+        display = l10n.status_closed;
+        break;
       default:
-        return Colors.grey;
+        color = Colors.grey;
+        display = status;
     }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withAlpha(25),
+        borderRadius: BorderRadius.circular(4),
+        border: Border.all(color: color.withAlpha(128)),
+      ),
+      child: Text(
+        display,
+        style: TextStyle(
+          color: color,
+          fontSize: 11,
+          fontWeight: FontWeight.bold,
+        ),
+      ),
+    );
   }
 }

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:fupan/l10n/generated/app_localizations.dart';
 import '../journal/journal_list_page.dart';
 import '../onboarding/onboarding_watchlist_page.dart';
 import '../stats/weekly_report_page.dart';
@@ -13,21 +14,22 @@ class MainShell extends StatefulWidget {
 class _MainShellState extends State<MainShell> {
   int _selectedIndex = 0;
 
-  final List<Widget> _pages = [
-    const JournalListPage(),
-    const Center(child: Text('异动 (Step 4 实现)')),
-    const WeeklyReportPage(),
-  ];
-
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final List<Widget> pages = [
+      const JournalListPage(),
+      Center(child: Text(l10n.tip_alerts_placeholder)),
+      const WeeklyReportPage(),
+    ];
+
     return Scaffold(
       appBar: AppBar(
-        title: const Text('交易前置复盘日记'),
+        title: Text(l10n.title_journal),
         actions: [
           IconButton(
             icon: const Icon(Icons.playlist_add_check),
-            tooltip: '管理关注股票',
+            tooltip: l10n.title_manage_watchlist,
             onPressed: () {
               Navigator.of(context).push(
                 MaterialPageRoute(
@@ -39,7 +41,7 @@ class _MainShellState extends State<MainShell> {
           ),
         ],
       ),
-      body: _pages[_selectedIndex],
+      body: pages[_selectedIndex],
       bottomNavigationBar: NavigationBar(
         selectedIndex: _selectedIndex,
         onDestinationSelected: (index) {
@@ -47,10 +49,19 @@ class _MainShellState extends State<MainShell> {
             _selectedIndex = index;
           });
         },
-        destinations: const [
-          NavigationDestination(icon: Icon(Icons.edit_note), label: '复盘'),
-          NavigationDestination(icon: Icon(Icons.bolt), label: '异动'),
-          NavigationDestination(icon: Icon(Icons.bar_chart), label: '统计'),
+        destinations: [
+          NavigationDestination(
+            icon: const Icon(Icons.edit_note),
+            label: l10n.label_nav_journal,
+          ),
+          NavigationDestination(
+            icon: const Icon(Icons.bolt),
+            label: l10n.label_nav_alerts,
+          ),
+          NavigationDestination(
+            icon: const Icon(Icons.bar_chart),
+            label: l10n.label_nav_stats,
+          ),
         ],
       ),
     );

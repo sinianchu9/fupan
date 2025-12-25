@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:fupan/l10n/generated/app_localizations.dart';
 import '../../core/providers.dart';
 import '../../models/symbol.dart';
 import '../../models/watchlist_item.dart';
@@ -23,7 +24,7 @@ class _OnboardingWatchlistPageState
 
   List<StockSymbol> _searchResults = [];
   List<WatchlistItem> _watchlist = [];
-  String _selectedIndustry = '全部行业';
+  String? _selectedIndustry;
   bool _isLoading = false;
 
   @override
@@ -51,7 +52,8 @@ class _OnboardingWatchlistPageState
         });
       }
     } catch (e) {
-      _showError('获取自选列表失败: $e');
+      final l10n = AppLocalizations.of(context)!;
+      _showError(l10n.tip_fetch_failed(e.toString()));
     } finally {
       setState(() => _isLoading = false);
     }
@@ -83,7 +85,8 @@ class _OnboardingWatchlistPageState
         });
       }
     } catch (e) {
-      _showError('搜索失败: $e');
+      final l10n = AppLocalizations.of(context)!;
+      _showError(l10n.tip_fetch_failed(e.toString()));
     } finally {
       setState(() => _isLoading = false);
     }
@@ -99,15 +102,19 @@ class _OnboardingWatchlistPageState
       );
       if (response.data['ok'] == true) {
         await _fetchWatchlist();
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('已添加 ${symbol.name}')));
+        if (mounted) {
+          final l10n = AppLocalizations.of(context)!;
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(l10n.tip_added_symbol(symbol.name))),
+          );
+        }
       }
     } catch (e) {
       if (e.toString().contains('403')) {
         _showSubscriptionLimitDialog();
       } else {
-        _showError('添加失败: $e');
+        final l10n = AppLocalizations.of(context)!;
+        _showError(l10n.tip_submit_failed(e.toString()));
       }
     } finally {
       setState(() => _isLoading = false);
@@ -126,7 +133,8 @@ class _OnboardingWatchlistPageState
         await _fetchWatchlist();
       }
     } catch (e) {
-      _showError('移除失败: $e');
+      final l10n = AppLocalizations.of(context)!;
+      _showError(l10n.tip_submit_failed(e.toString()));
     } finally {
       setState(() => _isLoading = false);
     }
@@ -134,6 +142,7 @@ class _OnboardingWatchlistPageState
 
   Future<void> _seedData() async {
     setState(() => _isLoading = true);
+    final l10n = AppLocalizations.of(context)!;
     try {
       final apiClient = ref.read(apiClientProvider);
       final response = await apiClient.post(
@@ -149,11 +158,11 @@ class _OnboardingWatchlistPageState
         },
       );
       if (response.data['ok'] == true) {
-        _showError('测试数据灌入成功，请重新搜索');
+        _showError(l10n.tip_seed_success);
         setState(() => _searchResults = []);
       }
     } catch (e) {
-      _showError('灌入失败: $e\n请确保已运行 npx wrangler d1 execute ... 初始化数据库');
+      _showError(l10n.tip_seed_failed(e.toString()));
     } finally {
       setState(() => _isLoading = false);
     }
@@ -166,19 +175,20 @@ class _OnboardingWatchlistPageState
   }
 
   void _showSubscriptionLimitDialog() {
+    final l10n = AppLocalizations.of(context)!;
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('订阅限制'),
-        content: const Text('免费版仅可添加 1 只股票。请升级以解锁更多名额。'),
+        title: Text(l10n.title_subscription_limit),
+        content: Text(l10n.tip_subscription_limit_msg),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('确定'),
+            child: Text(l10n.action_confirm),
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('了解升级'),
+            child: Text(l10n.action_learn_more_upgrade),
           ),
         ],
       ),
@@ -188,11 +198,11 @@ class _OnboardingWatchlistPageState
   List<String> get _industries {
     final industries = _searchResults.map((s) => s.industry).toSet().toList();
     industries.sort();
-    return ['全部行业', ...industries];
+    return industries;
   }
 
   List<StockSymbol> get _filteredResults {
-    if (_selectedIndustry == '全部行业') return _searchResults;
+    if (_selectedIndustry == null) return _searchResults;
     return _searchResults
         .where((s) => s.industry == _selectedIndustry)
         .toList();
@@ -200,19 +210,24 @@ class _OnboardingWatchlistPageState
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.isStandalone ? '管理关注股票' : '选择你关注的股票'),
+        title: Text(
+          widget.isStandalone
+              ? l10n.title_manage_watchlist
+              : l10n.title_select_watchlist,
+        ),
         automaticallyImplyLeading: widget.isStandalone,
       ),
       body: Column(
         children: [
           if (!widget.isStandalone)
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               child: Text(
-                '请至少添加 1 只股票以开始使用',
-                style: TextStyle(color: Colors.grey),
+                l10n.tip_add_at_least_one,
+                style: const TextStyle(color: Colors.grey),
               ),
             ),
 
@@ -222,7 +237,7 @@ class _OnboardingWatchlistPageState
             child: TextField(
               controller: _searchController,
               decoration: InputDecoration(
-                hintText: '输入代码/名称/行业',
+                hintText: l10n.hint_search_symbol,
                 prefixIcon: const Icon(Icons.search),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
@@ -249,20 +264,30 @@ class _OnboardingWatchlistPageState
               child: ListView(
                 scrollDirection: Axis.horizontal,
                 padding: const EdgeInsets.symmetric(horizontal: 16),
-                children: _industries
-                    .map(
-                      (industry) => Padding(
-                        padding: const EdgeInsets.only(right: 8),
-                        child: ChoiceChip(
-                          label: Text(industry),
-                          selected: _selectedIndustry == industry,
-                          onSelected: (selected) {
-                            setState(() => _selectedIndustry = industry);
-                          },
-                        ),
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: ChoiceChip(
+                      label: Text(l10n.label_all_industries),
+                      selected: _selectedIndustry == null,
+                      onSelected: (selected) {
+                        setState(() => _selectedIndustry = null);
+                      },
+                    ),
+                  ),
+                  ..._industries.map(
+                    (industry) => Padding(
+                      padding: const EdgeInsets.only(right: 8),
+                      child: ChoiceChip(
+                        label: Text(industry),
+                        selected: _selectedIndustry == industry,
+                        onSelected: (selected) {
+                          setState(() => _selectedIndustry = industry);
+                        },
                       ),
-                    )
-                    .toList(),
+                    ),
+                  ),
+                ],
               ),
             ),
 
@@ -276,12 +301,12 @@ class _OnboardingWatchlistPageState
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        const Text('未找到相关股票'),
+                        Text(l10n.tip_symbol_not_found),
                         const SizedBox(height: 16),
                         ElevatedButton.icon(
                           onPressed: _seedData,
                           icon: const Icon(Icons.data_usage),
-                          label: const Text('灌入测试数据 (Seed)'),
+                          label: Text(l10n.action_seed_data),
                         ),
                       ],
                     ),
@@ -294,8 +319,16 @@ class _OnboardingWatchlistPageState
                         (w) => w.symbolId == symbol.id,
                       );
                       return ListTile(
-                        title: Text('${symbol.code} ${symbol.name}'),
-                        subtitle: Text(symbol.industry),
+                        title: Text(
+                          '${symbol.code} ${symbol.name}',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        subtitle: Text(
+                          symbol.industry,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
                         trailing: isAdded
                             ? const Icon(
                                 Icons.check_circle,
@@ -303,7 +336,7 @@ class _OnboardingWatchlistPageState
                               )
                             : ElevatedButton(
                                 onPressed: () => _addToWatchlist(symbol),
-                                child: const Text('添加'),
+                                child: Text(l10n.action_add),
                               ),
                       );
                     },
@@ -313,13 +346,16 @@ class _OnboardingWatchlistPageState
           // 已添加区域
           if (_watchlist.isNotEmpty) ...[
             const Divider(),
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               child: Row(
                 children: [
-                  Icon(Icons.list, size: 18),
-                  SizedBox(width: 8),
-                  Text('已添加', style: TextStyle(fontWeight: FontWeight.bold)),
+                  const Icon(Icons.list, size: 18),
+                  const SizedBox(width: 8),
+                  Text(
+                    l10n.label_added,
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
                 ],
               ),
             ),
@@ -336,7 +372,9 @@ class _OnboardingWatchlistPageState
                     margin: const EdgeInsets.only(right: 12, bottom: 12),
                     padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
-                      color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                      color: Theme.of(
+                        context,
+                      ).colorScheme.surfaceContainerHighest,
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Column(
@@ -355,12 +393,18 @@ class _OnboardingWatchlistPageState
                                 overflow: TextOverflow.ellipsis,
                               ),
                             ),
-                            GestureDetector(
-                              onTap: () => _removeFromWatchlist(item),
-                              child: const Icon(
-                                Icons.close,
-                                size: 16,
-                                color: Colors.grey,
+                            SizedBox(
+                              width: 32,
+                              height: 32,
+                              child: IconButton(
+                                icon: const Icon(
+                                  Icons.close,
+                                  size: 16,
+                                  color: Colors.grey,
+                                ),
+                                onPressed: () => _removeFromWatchlist(item),
+                                padding: EdgeInsets.zero,
+                                constraints: const BoxConstraints(),
                               ),
                             ),
                           ],
@@ -389,32 +433,38 @@ class _OnboardingWatchlistPageState
 
           // 底部按钮
           if (!widget.isStandalone)
-            Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: SizedBox(
-                width: double.infinity,
-                height: 50,
-                child: ElevatedButton(
-                  onPressed: _watchlist.isEmpty
-                      ? null
-                      : () {
-                          Navigator.of(context).pushAndRemoveUntil(
-                            MaterialPageRoute(
-                              builder: (context) => const MainShell(),
-                            ),
-                            (route) => false,
-                          );
-                        },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Theme.of(context).colorScheme.primary,
-                    foregroundColor: Theme.of(context).colorScheme.onPrimary,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
+            SafeArea(
+              top: false,
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: SizedBox(
+                  width: double.infinity,
+                  height: 50,
+                  child: ElevatedButton(
+                    onPressed: _watchlist.isEmpty
+                        ? null
+                        : () {
+                            Navigator.of(context).pushAndRemoveUntil(
+                              MaterialPageRoute(
+                                builder: (context) => const MainShell(),
+                              ),
+                              (route) => false,
+                            );
+                          },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Theme.of(context).colorScheme.primary,
+                      foregroundColor: Theme.of(context).colorScheme.onPrimary,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
                     ),
-                  ),
-                  child: const Text(
-                    '进入应用',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                    child: Text(
+                      l10n.action_enter_app,
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
                   ),
                 ),
               ),
