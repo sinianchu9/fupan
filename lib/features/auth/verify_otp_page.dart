@@ -61,7 +61,7 @@ class _VerifyOtpPageState extends ConsumerState<VerifyOtpPage> {
           mainAxisAlignment: MainAxisAlignment.center,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text(
+            const Text(
               '验证码已发送至',
               textAlign: TextAlign.center,
               style: TextStyle(color: Colors.grey),

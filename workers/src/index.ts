@@ -6,6 +6,7 @@ export interface Env {
   JWT_ISSUER: string;
   JWT_AUDIENCE: string;
   JWT_SECRET: string;
+  RESEND_API_KEY: string;
 }
 
 type Json = Record<string, any>;
@@ -171,14 +172,44 @@ async function route(req: Request, env: Env): Promise<Response> {
     if (!email || !email.includes("@")) return bad("Invalid email");
 
     const code = Math.floor(100000 + Math.random() * 900000).toString();
-    console.log(`[OTP] ${email}: ${code}`); // In dev, we can see it in logs
+    
+    // Rate Limiting: Check if an OTP was sent recently (e.g., last 60s)
+    const recentOtp = await env.DB.prepare(
+      "SELECT created_at FROM login_otps WHERE email = ? AND created_at > ? ORDER BY created_at DESC LIMIT 1"
+    ).bind(email, nowEpoch() - 60).first();
+    
+    if (recentOtp) {
+      return bad("Please wait 60 seconds before requesting a new code", 429);
+    }
 
-    const hash = await hashOtp(code);
-    const expiresAt = Math.floor(Date.now() / 1000) + 600; // 10 mins
+    // Send email via Resend
+    const res = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${env.RESEND_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        from: "复盘助手 <auth@mail.miamioh.edu.pl>",
+        to: [email],
+        subject: "【复盘助手】您的登录验证码",
+        html: `<p>您的验证码是 <strong>${code}</strong>，有效期 10 分钟。请勿泄露给他人。</p>`,
+      }),
+    });
+
+    if (!res.ok) {
+      const error = await res.text();
+      console.error("Resend API Error:", error);
+      return bad("Failed to send verification code", 500);
+    }
+
+    // Use email as salt and JWT_SECRET as pepper
+    const hash = await hashOtp(code, email, env.JWT_SECRET);
+    const expiresAt = nowEpoch() + 600; // 10 mins
 
     await env.DB.prepare(
       "INSERT INTO login_otps (id, email, code_hash, expires_at, attempts, created_at) VALUES (?, ?, ?, ?, ?, ?)"
-    ).bind(uuid(), email, hash, expiresAt, 0, Math.floor(Date.now() / 1000)).run();
+    ).bind(uuid(), email, hash, expiresAt, 0, nowEpoch()).run();
 
     return ok();
   }
@@ -194,12 +225,16 @@ async function route(req: Request, env: Env): Promise<Response> {
 
     if (!otp) return bad("Invalid or expired OTP", 401);
 
-    const hash = await hashOtp(code);
+    const hash = await hashOtp(code, email, env.JWT_SECRET);
     if ((otp as any).code_hash !== hash) {
       await env.DB.prepare("UPDATE login_otps SET attempts = attempts + 1 WHERE id = ?")
         .bind((otp as any).id).run();
       return bad("Invalid OTP", 401);
     }
+
+    // Success! Invalidate OTP immediately
+    await env.DB.prepare("UPDATE login_otps SET expires_at = 0 WHERE id = ?")
+      .bind((otp as any).id).run();
 
     // Success! Find or create user
     let user = await env.DB.prepare("SELECT id, email FROM app_users WHERE email = ?")

@@ -109,7 +109,9 @@ class _SelfAssessmentPageState extends ConsumerState<SelfAssessmentPage> {
   Widget _buildProgressIndicator() {
     return Container(
       padding: const EdgeInsets.all(16),
-      color: Theme.of(context).colorScheme.surfaceVariant.withOpacity(0.3),
+      color: Theme.of(
+        context,
+      ).colorScheme.surfaceContainerHighest.withOpacity(0.3),
       child: Row(
         children: [
           Expanded(
@@ -171,7 +173,7 @@ class _SelfAssessmentPageState extends ConsumerState<SelfAssessmentPage> {
                 decoration: BoxDecoration(
                   color: Theme.of(
                     context,
-                  ).colorScheme.surfaceVariant.withOpacity(0.5),
+                  ).colorScheme.surfaceContainerHighest.withOpacity(0.5),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(

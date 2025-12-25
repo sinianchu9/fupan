@@ -49,7 +49,7 @@ export async function verifyJwtHS256(
   const isValid = await crypto.subtle.verify(
     "HMAC",
     key,
-    signature,
+    signature as any,
     new TextEncoder().encode(data)
   );
 
@@ -66,8 +66,9 @@ export async function verifyJwtHS256(
   return payload;
 }
 
-export async function hashOtp(code: string): Promise<string> {
-  const msgUint8 = new TextEncoder().encode(code);
+export async function hashOtp(code: string, salt: string, pepper: string): Promise<string> {
+  // Combine code, salt, and pepper for hashing
+  const msgUint8 = new TextEncoder().encode(`${code}:${salt}:${pepper}`);
   const hashBuffer = await crypto.subtle.digest("SHA-256", msgUint8);
   const hashArray = Array.from(new Uint8Array(hashBuffer));
   return hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
