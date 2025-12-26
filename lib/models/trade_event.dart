@@ -4,6 +4,9 @@ class TradeEvent {
   final String summary;
   final String impactTarget;
   final bool triggeredExit;
+  final String? eventStage;
+  final String? behaviorDriver;
+  final double? priceAtEvent;
   final int createdAt;
 
   TradeEvent({
@@ -12,6 +15,9 @@ class TradeEvent {
     required this.summary,
     required this.impactTarget,
     required this.triggeredExit,
+    this.eventStage,
+    this.behaviorDriver,
+    this.priceAtEvent,
     required this.createdAt,
   });
 
@@ -22,6 +28,9 @@ class TradeEvent {
       summary: json['summary'],
       impactTarget: json['impact_target'],
       triggeredExit: _parseBool(json['triggered_exit']),
+      eventStage: json['event_stage'],
+      behaviorDriver: json['behavior_driver'],
+      priceAtEvent: json['price_at_event']?.toDouble(),
       createdAt: json['created_at'],
     );
   }

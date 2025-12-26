@@ -4,8 +4,9 @@ import '../../../models/trade_result.dart';
 
 class ResultCard extends StatelessWidget {
   final TradeResult result;
+  final double? actualEntryPrice;
 
-  const ResultCard({super.key, required this.result});
+  const ResultCard({super.key, required this.result, this.actualEntryPrice});
 
   @override
   Widget build(BuildContext context) {
@@ -14,6 +15,13 @@ class ResultCard extends StatelessWidget {
     ).format(DateTime.fromMillisecondsSinceEpoch(result.closedAt * 1000));
 
     final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    double? profit;
+    double? profitPercent;
+    if (actualEntryPrice != null && actualEntryPrice! > 0) {
+      profit = result.sellPrice - actualEntryPrice!;
+      profitPercent = (profit / actualEntryPrice!) * 100;
+    }
 
     return Card(
       color: Colors.indigo.withValues(alpha: isDark ? 0.1 : 0.04),
@@ -70,9 +78,21 @@ class ResultCard extends StatelessWidget {
             _buildResultRow(context, '卖出原因', result.reasonDisplay),
             _buildResultRow(
               context,
+              '实际成交价',
+              actualEntryPrice?.toStringAsFixed(2) ?? 'N/A',
+            ),
+            _buildResultRow(
+              context,
               '实际卖出价',
               result.sellPrice.toStringAsFixed(2),
             ),
+            if (profit != null)
+              _buildResultRow(
+                context,
+                '盈亏额/率',
+                '${profit > 0 ? "+" : ""}${profit.toStringAsFixed(2)} (${profitPercent! > 0 ? "+" : ""}${profitPercent.toStringAsFixed(2)}%)',
+                valueColor: profit >= 0 ? Colors.red : Colors.green,
+              ),
             _buildResultRow(context, '结束时间', closedDateStr),
           ],
         ),
@@ -85,15 +105,20 @@ class ResultCard extends StatelessWidget {
     String label,
     String value, {
     bool isJudgement = false,
+    Color? valueColor,
   }) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    Color valueColor = isJudgement
-        ? Colors.blue
-        : (isDark ? Colors.white70 : Colors.black87);
+    Color finalValueColor =
+        valueColor ??
+        (isJudgement
+            ? Colors.blue
+            : (isDark ? Colors.white70 : Colors.black87));
 
     if (isJudgement) {
-      if (result.systemJudgement == 'follow_plan') valueColor = Colors.green;
-      if (result.systemJudgement == 'emotion_override') valueColor = Colors.red;
+      if (result.systemJudgement == 'follow_plan')
+        finalValueColor = Colors.green;
+      if (result.systemJudgement == 'emotion_override')
+        finalValueColor = Colors.red;
     }
 
     return Padding(
@@ -115,7 +140,7 @@ class ResultCard extends StatelessWidget {
               style: TextStyle(
                 fontSize: 13,
                 fontWeight: isJudgement ? FontWeight.bold : FontWeight.normal,
-                color: valueColor,
+                color: finalValueColor,
               ),
             ),
           ),

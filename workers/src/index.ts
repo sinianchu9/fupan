@@ -11,6 +11,32 @@ export interface Env {
 
 type Json = Record<string, any>;
 
+interface Evidence {
+  type: 'plan_field' | 'trade' | 'event';
+  id: string;
+  title: string;
+  detail: string;
+  ts: number;
+}
+
+interface WeeklyMetric {
+  key: string;
+  name: string;
+  status: 'triggered' | 'not_triggered' | 'na' | 'insufficient_data';
+  score: number | null;
+  metrics: {
+    deviation_pct?: number | null;
+    cost_pct?: number | null;
+    delay_level?: number | null;
+  };
+  thresholds: {
+    deviation_threshold: number;
+    hit_epsilon: number;
+  };
+  summary_line: string;
+  evidence: Evidence[];
+}
+
 import { signJwtHS256, verifyJwtHS256, hashOtp } from "./auth_utils";
 
 function nowEpoch() {
@@ -376,6 +402,8 @@ async function route(req: Request, env: Env): Promise<Response> {
     const rows = await env.DB.prepare(
       `SELECT p.id, p.status, p.direction, p.buy_reason_text,
               p.target_low, p.target_high, p.created_at, p.updated_at, p.is_archived,
+              p.planned_entry_price, p.actual_entry_price, p.entry_driver,
+              COALESCE(p.actual_entry_price, p.planned_entry_price, p.entry_price) as entry_price,
               s.code as symbol_code, s.name as symbol_name, s.industry as symbol_industry
        FROM trade_plans p
        JOIN symbols s ON s.id = p.symbol_id
@@ -427,6 +455,8 @@ if (method === "GET" && path === "/plans/archived") {
   const rows = await env.DB.prepare(
     `SELECT p.id, p.status, p.direction, p.buy_reason_text,
             p.target_low, p.target_high, p.created_at, p.updated_at, p.is_archived,
+            p.planned_entry_price, p.actual_entry_price, p.entry_driver,
+            COALESCE(p.actual_entry_price, p.planned_entry_price, p.entry_price) as entry_price,
             s.code as symbol_code, s.name as symbol_name, s.industry as symbol_industry
      FROM trade_plans p
      JOIN symbols s ON s.id = p.symbol_id
@@ -456,7 +486,8 @@ if (method === "GET" && path === "/plans/archived") {
       stop_type,
       stop_value,
       stop_time_days,
-      entry_price,
+      planned_entry_price,
+      entry_price, // 兼容字段
     } = body;
 
     if (!symbol_id) return bad("symbol_id required");
@@ -482,9 +513,9 @@ if (method === "GET" && path === "/plans/archived") {
         target_type, target_low, target_high,
         sell_conditions, time_take_profit_days,
         stop_type, stop_value, stop_time_days,
-        entry_price,
+        planned_entry_price, entry_price,
         created_at, updated_at
-      ) VALUES (?, ?, ?, ?, 'draft', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      ) VALUES (?, ?, ?, ?, 'draft', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     )
       .bind(
         id, userId, symbol_id, String(direction),
@@ -493,7 +524,8 @@ if (method === "GET" && path === "/plans/archived") {
         JSON.stringify(sell_conditions), time_take_profit_days == null ? null : Number(time_take_profit_days),
         String(stop_type), stop_value == null ? null : Number(stop_value),
         stop_time_days == null ? null : Number(stop_time_days),
-        entry_price == null ? null : Number(entry_price),
+        planned_entry_price != null ? Number(planned_entry_price) : (entry_price != null ? Number(entry_price) : null),
+        planned_entry_price != null ? Number(planned_entry_price) : (entry_price != null ? Number(entry_price) : null),
         ts, ts
       )
       .run();
@@ -509,14 +541,14 @@ if (method === "GET" && path === "/plans/archived") {
     if (!plan) return bad("not found", 404);
 
     const events = await env.DB.prepare(
-      `SELECT id, event_type, summary, impact_target, triggered_exit, created_at
+      `SELECT id, event_type, summary, impact_target, triggered_exit, event_stage, behavior_driver, price_at_event, created_at
        FROM trade_events
        WHERE plan_id=? AND user_id=?
        ORDER BY created_at ASC`
     ).bind(planId, userId).all();
 
     const result = await env.DB.prepare(
-      `SELECT plan_id, sell_price, sell_reason, system_judgement, conclusion_text, closed_at
+      `SELECT plan_id, sell_price, sell_reason, system_judgement, conclusion_text, post_exit_best_price, epc_opportunity_pct, closed_at
        FROM trade_results
        WHERE plan_id=? AND user_id=?`
     ).bind(planId, userId).first();
@@ -543,11 +575,16 @@ if (method === "GET" && path === "/plans/archived") {
     const plan = await getPlan(env, userId, planId);
     if (!plan) return bad("not found", 404);
     if (plan.status !== "draft") return bad("only draft can be armed", 409);
+    
+    const body = await readJson(req);
+    const actual_entry_price = body?.actual_entry_price || body?.entry_price;
+    const entry_driver = body?.entry_driver;
+    if (actual_entry_price == null) return bad("actual_entry_price required", 400);
 
     const ts = nowEpoch();
     await env.DB.prepare(
-      `UPDATE trade_plans SET status='armed', updated_at=? WHERE id=? AND user_id=?`
-    ).bind(ts, planId, userId).run();
+      `UPDATE trade_plans SET status='armed', actual_entry_price=?, entry_price=?, entry_driver=?, updated_at=? WHERE id=? AND user_id=?`
+    ).bind(Number(actual_entry_price), Number(actual_entry_price), entry_driver || null, ts, planId, userId).run();
 
     return ok();
   }
@@ -578,7 +615,11 @@ if (method === "GET" && path === "/plans/archived") {
       "stop_type",
       "stop_value",
       "stop_time_days",
+      "planned_entry_price",
+      "actual_entry_price",
+      "entry_driver",
       "entry_price",
+      "exit_plan_target_price",
     ]);
 
     const updates: string[] = [];
@@ -589,8 +630,8 @@ if (method === "GET" && path === "/plans/archived") {
 
       // armed/holding/closed 不允许改关键字段（尤其 buy_reason_text）
       if (plan.status !== "draft") {
-        // 只允许补充 entry_price 这种执行类字段（你可扩）
-        if (!["entry_price"].includes(k)) {
+        // 只允许补充 actual_entry_price 这种执行类字段
+        if (!["actual_entry_price", "entry_price"].includes(k)) {
           // 写入修订记录，但不改原计划（避免事后改口）
           await env.DB.prepare(
             `INSERT INTO plan_edits (id, plan_id, user_id, field, old_value, new_value, edited_at)
@@ -612,6 +653,15 @@ if (method === "GET" && path === "/plans/archived") {
       if (k === "buy_reason_types" || k === "sell_conditions") {
         binds.push(JSON.stringify(v));
       } else {
+        binds.push(v);
+      }
+      // 同步更新兼容字段
+      if (k === "planned_entry_price" && plan.status === "draft") {
+        updates.push(`entry_price=?`);
+        binds.push(v);
+      }
+      if (k === "actual_entry_price" && plan.status !== "draft") {
+        updates.push(`entry_price=?`);
         binds.push(v);
       }
     }
@@ -636,37 +686,36 @@ if (method === "POST" && path.startsWith("/plans/") && path.endsWith("/add-event
   if (String(plan.status) === "closed") return bad("closed plan is read-only", 409);
 
   const body = await readJson(req);
-  const { event_type, summary, impact_target, triggered_exit } = body || {};
+  const { event_type, summary, impact_target, triggered_exit, event_stage, behavior_driver, price_at_event } = body || {};
 
   // ✅ triggered_exit 必填（必须明确回答：是否触发退出条件）
   if (triggered_exit === undefined || triggered_exit === null) {
     return bad("triggered_exit required");
   }
 
-  if (!event_type || !summary || !impact_target) return bad("event_type/summary/impact_target required");
+  if (!summary || !event_stage) return bad("summary and event_stage required");
 
-  // 只允许 4 类
-  const allowedTypes = new Set(["falsify", "forced", "verify", "structure"]);
-  if (!allowedTypes.has(String(event_type))) return bad("invalid event_type");
-
-  // impact_target 白名单（建议加上，防脏数据）
-  const allowedTargets = new Set(["buy_logic", "sell_logic", "stop_loss"]);
-  if (!allowedTargets.has(String(impact_target))) return bad("invalid impact_target");
+  // 兼容旧版 event_type 和 impact_target
+  const finalEventType = event_type || "external_change";
+  const finalImpactTarget = impact_target || "buy_logic";
 
   const id = uuid();
   const summaryText = String(summary).trim();
   if (!summaryText) return bad("summary required");
 
   await env.DB.prepare(
-    `INSERT INTO trade_events (id, plan_id, user_id, event_type, summary, impact_target, triggered_exit)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`
+    `INSERT INTO trade_events (id, plan_id, user_id, event_type, summary, impact_target, triggered_exit, event_stage, behavior_driver, price_at_event)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   )
     .bind(
       id, planId, userId,
-      String(event_type),
-      summaryText.slice(0, 40), // ✅ 与前端统一：40
-      String(impact_target),
-      triggered_exit ? 1 : 0
+      String(finalEventType),
+      summaryText.slice(0, 40),
+      String(finalImpactTarget),
+      triggered_exit ? 1 : 0,
+      event_stage || null,
+      behavior_driver || null,
+      price_at_event != null ? Number(price_at_event) : null
     )
     .run();
 
@@ -681,29 +730,57 @@ if (method === "POST" && path.startsWith("/plans/") && path.endsWith("/add-event
     if (!plan) return bad("not found", 404);
     
     // ✅ State Machine Integrity: Only 'armed' plans can be closed
-    if (plan.status !== "armed") {
+    if (plan.status !== "armed" && plan.status !== "holding") {
       return bad(`cannot close plan in '${plan.status}' status`, 403);
     }
 
+    if (plan.actual_entry_price == null) {
+      return bad("actual_entry_price required before closing", 400);
+    }
+
     const body = await readJson(req);
-    const sell_price = body?.sell_price;
-    const sell_reason = body?.sell_reason; // e.g. "follow_plan" / "fear" / "panic" / "external" / "other"
+    const { sell_price, sell_reason, post_exit_best_price, exit_plan_target_price } = body || {};
     if (sell_price == null || !sell_reason) return bad("sell_price and sell_reason required");
 
     const { judgement, conclusion } = judge(plan, String(sell_reason));
 
+    // Calculate EPC
+    let epc_opportunity_pct = null;
+    const final_target_price = exit_plan_target_price || plan.exit_plan_target_price;
+    
+    if (final_target_price && Number(sell_price) < Number(final_target_price) && post_exit_best_price && Number(post_exit_best_price) > Number(sell_price)) {
+      // Check for invalidation events
+      const invalidation = await env.DB.prepare(
+        "SELECT 1 FROM trade_events WHERE plan_id = ? AND triggered_exit = 1"
+      ).bind(planId).first();
+      
+      if (!invalidation) {
+        epc_opportunity_pct = (Number(post_exit_best_price) - Number(sell_price)) / Number(sell_price);
+      }
+    }
+
     // 事务：写结果 + 更新计划状态
     const ts = nowEpoch();
-    await env.DB.batch([
+    const stmts = [
       env.DB.prepare(
         `INSERT INTO trade_results
-         (plan_id, user_id, sell_price, sell_reason, system_judgement, conclusion_text, closed_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?)`
-      ).bind(planId, userId, Number(sell_price), String(sell_reason), judgement, conclusion, ts),
+         (plan_id, user_id, sell_price, sell_reason, system_judgement, conclusion_text, post_exit_best_price, epc_opportunity_pct, closed_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      ).bind(planId, userId, Number(sell_price), String(sell_reason), judgement, conclusion, 
+             post_exit_best_price != null ? Number(post_exit_best_price) : null, 
+             epc_opportunity_pct, ts),
       env.DB.prepare(
         `UPDATE trade_plans SET status='closed', updated_at=? WHERE id=? AND user_id=?`
       ).bind(ts, planId, userId),
-    ]);
+    ];
+
+    if (exit_plan_target_price != null) {
+      stmts.push(
+        env.DB.prepare(`UPDATE trade_plans SET exit_plan_target_price=? WHERE id=?`).bind(Number(exit_plan_target_price), planId)
+      );
+    }
+
+    await env.DB.batch(stmts);
 
     return ok({ system_judgement: judgement, conclusion_text: conclusion });
   }
@@ -781,149 +858,365 @@ if (method === "POST" && path.startsWith("/plans/") && path.endsWith("/add-event
     return ok({ review: review || null });
   }
 
-  // ---- weekly report (MVP: PCS/TNR/LDC 的骨架先跑) ----
-  // GET /report/weekly?days=7  （默认7天）
+  // ---- weekly report (Audit Style) ----
   if (method === "GET" && path === "/report/weekly") {
-    const sql = `
-      WITH params AS (
-        SELECT
-          CAST(strftime('%s', date('now','weekday 1','-7 days')) AS INTEGER) AS ws,
-          CAST(strftime('%s','now') AS INTEGER) AS we
-      ),
-      weekly_closed AS (
-        SELECT r.plan_id, r.user_id, r.sell_price, r.system_judgement, r.conclusion_text, r.closed_at
-        FROM trade_results r, params p
-        WHERE r.user_id = ?
-          AND r.closed_at >= p.ws AND r.closed_at < p.we
-      ),
-      counts AS (
-        SELECT
-          COUNT(*) AS total_closed,
-          SUM(CASE WHEN system_judgement='follow_plan' THEN 1 ELSE 0 END) AS cnt_follow,
-          SUM(CASE WHEN system_judgement='no_plan' THEN 1 ELSE 0 END) AS cnt_no_plan,
-          SUM(CASE WHEN system_judgement='emotion_override' THEN 1 ELSE 0 END) AS cnt_emotion
-        FROM weekly_closed
-      ),
-      main_dev AS (
-        SELECT
-          CASE
-            WHEN (SELECT total_closed FROM counts)=0 THEN 'no_trades'
-            WHEN (SELECT cnt_no_plan FROM counts) > 0 THEN 'no_plan'
-            WHEN (SELECT cnt_emotion FROM counts) > 0 THEN 'emotion_override'
-            ELSE
-              CASE
-                WHEN EXISTS (
-                  SELECT 1
-                  FROM trade_events e, params p
-                  WHERE e.user_id=?
-                    AND e.event_type='forced'
-                    AND e.created_at >= p.ws AND e.created_at < p.we
-                ) THEN 'forced'
-                ELSE 'none'
-              END
-          END AS main_deviation
-      ),
-      rep_conclusion AS (
-        SELECT c.conclusion_text
-        FROM weekly_closed c
-        WHERE c.system_judgement <> 'follow_plan'
-        ORDER BY c.closed_at DESC
-        LIMIT 1
-      ),
-      rep_conclusion_fallback AS (
-        SELECT c.conclusion_text
-        FROM weekly_closed c
-        ORDER BY c.closed_at DESC
-        LIMIT 1
-      ),
-      tnr AS (
-        SELECT
-          CASE
-            WHEN (SELECT total_closed FROM counts)=0 AND NOT EXISTS (
-              SELECT 1 FROM trade_events e, params p
-              WHERE e.user_id=?
-                AND e.event_type='verify'
-                AND e.impact_target='sell_logic'
-                AND e.triggered_exit=0
-                AND e.created_at >= p.ws AND e.created_at < p.we
-            ) THEN '不适用'
-            WHEN EXISTS (
-              SELECT 1 FROM trade_events e, params p
-              WHERE e.user_id=?
-                AND e.event_type='verify'
-                AND e.impact_target='sell_logic'
-                AND e.triggered_exit=0
-                AND e.created_at >= p.ws AND e.created_at < p.we
-            ) THEN '发生'
-            ELSE '未发生'
-          END AS tnr_status
-      ),
-      ldc_calc AS (
-        SELECT
-          SUM(
-            CASE
-              WHEN p.stop_value IS NULL THEN 0
-              WHEN p.direction='long'  AND wc.sell_price < p.stop_value THEN (p.stop_value - wc.sell_price)
-              WHEN p.direction='short' AND wc.sell_price > p.stop_value THEN (wc.sell_price - p.stop_value)
-              ELSE 0
-            END
-          ) AS ldc_value,
-          SUM(
-            CASE
-              WHEN p.stop_value IS NULL THEN 0
-              WHEN EXISTS (
-                SELECT 1 FROM trade_events e
-                WHERE e.plan_id = wc.plan_id
-                  AND e.user_id=?
-                  AND e.impact_target='stop_loss'
-                  AND e.triggered_exit=0
-              ) THEN 1
-              ELSE 0
-            END
-          ) AS ldc_evidence_count
-        FROM weekly_closed wc
-        JOIN trade_plans p ON p.id = wc.plan_id AND p.user_id = ?
-      ),
-      ldc AS (
-        SELECT
-          CASE
-            WHEN (SELECT total_closed FROM counts)=0 THEN '不适用'
-            WHEN (SELECT ldc_evidence_count FROM ldc_calc) > 0 THEN '发生'
-            ELSE '未发生'
-          END AS ldc_status,
-          CASE
-            WHEN (SELECT ldc_evidence_count FROM ldc_calc) > 0 THEN (SELECT ldc_value FROM ldc_calc)
-            ELSE NULL
-          END AS ldc_value
-      )
-      SELECT
-        (SELECT total_closed FROM counts) AS total_closed,
-        CASE
-          WHEN (SELECT total_closed FROM counts)=0 THEN NULL
-          ELSE ROUND( (CAST((SELECT cnt_follow FROM counts) AS REAL) / (SELECT total_closed FROM counts)) * 100, 0)
-        END AS pcs,
-        (SELECT main_deviation FROM main_dev) AS main_deviation,
-        COALESCE((SELECT conclusion_text FROM rep_conclusion),
-                 (SELECT conclusion_text FROM rep_conclusion_fallback)) AS conclusion_text,
-        (SELECT tnr_status FROM tnr) AS tnr_status,
-        (SELECT ldc_status FROM ldc) AS ldc_status,
-        (SELECT ldc_value FROM ldc) AS ldc_value
-    `;
+    const DEVIATION_THRESHOLD = 0.01;
+    const HIT_EPSILON = 0.005;
 
-    const row = await env.DB.prepare(sql)
-      .bind(userId, userId, userId, userId, userId, userId)
-      .first();
+    // 1. Calculate week range (Monday to Sunday)
+    const now = new Date();
+    const day = now.getDay(); // 0 is Sunday, 1 is Monday...
+    const diffToMonday = (day === 0 ? -6 : 1) - day;
+    const monday = new Date(now);
+    monday.setHours(0, 0, 0, 0);
+    monday.setDate(now.getDate() + diffToMonday);
+    
+    const ws = Math.floor(monday.getTime() / 1000);
+    const we = Math.floor(now.getTime() / 1000);
 
-    if (!row) return bad("Failed to calculate report");
+    // 2. Fetch Data
+    // Results closed this week
+    const results = (await env.DB.prepare(
+      "SELECT * FROM trade_results WHERE user_id = ? AND closed_at >= ? AND closed_at < ?"
+    ).bind(userId, ws, we).all()).results;
+
+    // Events created this week
+    const events = (await env.DB.prepare(
+      "SELECT * FROM trade_events WHERE user_id = ? AND created_at >= ? AND created_at < ?"
+    ).bind(userId, ws, we).all()).results;
+
+    // Plans involved (either closed this week or had events this week)
+    const planIds = new Set<string>();
+    results.forEach((r: any) => planIds.add(r.plan_id));
+    events.forEach((e: any) => planIds.add(e.plan_id));
+
+    let plans: any[] = [];
+    if (planIds.size > 0) {
+      const placeholders = Array.from(planIds).map(() => "?").join(",");
+      plans = (await env.DB.prepare(
+        `SELECT * FROM trade_plans WHERE user_id = ? AND id IN (${placeholders})`
+      ).bind(userId, ...Array.from(planIds)).all()).results;
+    }
+
+    const planMap = new Map(plans.map(p => [p.id, p]));
+
+    // 3. Metric Calculations
+    
+    // --- 4.2 E-TNR (Buy) ---
+    const calculateETNR = (): WeeklyMetric => {
+      const evidence: Evidence[] = [];
+      let maxScore = 0;
+      let triggered = false;
+      let hasData = false;
+      let na = true;
+
+      for (const p of plans) {
+        if (p.planned_entry_price) {
+          na = false;
+          if (p.actual_entry_price) {
+            hasData = true;
+            if (p.actual_entry_price > p.planned_entry_price * (1 + DEVIATION_THRESHOLD)) {
+              triggered = true;
+              const dev = (p.actual_entry_price - p.planned_entry_price) / p.planned_entry_price;
+              const score = Math.min(100, (dev / 0.10) * 100);
+              if (score > maxScore) maxScore = score;
+              
+              evidence.push({
+                type: 'plan_field',
+                id: p.id,
+                title: `${p.symbol_code} 预算价`,
+                detail: `planned_entry_price=${p.planned_entry_price}`,
+                ts: p.created_at
+              });
+              evidence.push({
+                type: 'trade',
+                id: p.id,
+                title: `${p.symbol_code} 实际建仓价`,
+                detail: `actual_entry_price=${p.actual_entry_price}`,
+                ts: p.updated_at
+              });
+            }
+          }
+        }
+      }
+
+      return {
+        key: 'E-TNR',
+        name: '买入追高',
+        status: na ? 'na' : (!hasData ? 'insufficient_data' : (triggered ? 'triggered' : 'not_triggered')),
+        score: triggered ? Math.round(maxScore) : 0,
+        metrics: { deviation_pct: triggered ? maxScore / 1000 : null }, // Placeholder logic
+        thresholds: { deviation_threshold: DEVIATION_THRESHOLD, hit_epsilon: HIT_EPSILON },
+        summary_line: triggered 
+          ? `本周存在买入追高偏离，最大偏离幅度约 ${Math.round(maxScore/10)}%。`
+          : "本周未发现明显的买入追高行为。",
+        evidence: evidence.slice(0, 5)
+      };
+    };
+
+    // --- 4.3 E-LDC (Buy) ---
+    const calculateELDC = (): WeeklyMetric => {
+      const evidence: Evidence[] = [];
+      let triggered = false;
+      let maxScore = 0;
+
+      for (const e of events) {
+        if (e.event_stage === 'entry_non_action') {
+          triggered = true;
+          let score = 30;
+          if (e.price_at_event) score = 70;
+          else if (e.summary) score = 50;
+          
+          if (score > maxScore) maxScore = score;
+          evidence.push({
+            type: 'event',
+            id: e.id,
+            title: '低位未执行事件',
+            detail: e.summary || '未填写摘要',
+            ts: e.created_at
+          });
+        }
+      }
+
+      return {
+        key: 'E-LDC',
+        name: '低位未买',
+        status: triggered ? 'triggered' : 'not_triggered',
+        score: maxScore,
+        metrics: {},
+        thresholds: { deviation_threshold: DEVIATION_THRESHOLD, hit_epsilon: HIT_EPSILON },
+        summary_line: triggered 
+          ? `本周记录了 ${evidence.length} 条低位未执行证据。`
+          : "本周未记录低位未执行事件。",
+        evidence
+      };
+    };
+
+    // --- 4.4 TNR (Sell) ---
+    const calculateTNR = (): WeeklyMetric => {
+      const evidence: Evidence[] = [];
+      let triggered = false;
+      let hasTarget = false;
+      let hasEvent = false;
+
+      for (const p of plans) {
+        if (p.target_high || p.exit_plan_target_price) {
+          hasTarget = true;
+          const planEvents = events.filter((e: any) => e.plan_id === p.id && e.event_type === 'verify');
+          if (planEvents.length > 0) {
+            hasEvent = true;
+            // Check if sold after event
+            const result = results.find((r: any) => r.plan_id === p.id);
+            if (!result || result.closed_at < planEvents[0].created_at) {
+              triggered = true;
+              evidence.push({
+                type: 'plan_field',
+                id: p.id,
+                title: `${p.symbol_code} 卖出目标`,
+                detail: `target=${p.target_high || p.exit_plan_target_price}`,
+                ts: p.created_at
+              });
+              evidence.push({
+                type: 'event',
+                id: planEvents[0].id,
+                title: '验证/兑现事件',
+                detail: planEvents[0].summary,
+                ts: planEvents[0].created_at
+              });
+            }
+          }
+        }
+      }
+
+      return {
+        key: 'TNR',
+        name: '到位不卖',
+        status: !hasTarget ? 'na' : (!hasEvent ? 'insufficient_data' : (triggered ? 'triggered' : 'not_triggered')),
+        score: triggered ? 80 : 0,
+        metrics: {},
+        thresholds: { deviation_threshold: DEVIATION_THRESHOLD, hit_epsilon: HIT_EPSILON },
+        summary_line: triggered 
+          ? "本周存在目标到位后未及时卖出的情况。"
+          : (hasEvent ? "本周目标到位后已执行卖出。" : "本周未记录目标验证事件。"),
+        evidence
+      };
+    };
+
+    // --- 4.5 LDC (Sell) ---
+    const calculateLDC = (): WeeklyMetric => {
+      const evidence: Evidence[] = [];
+      let maxScore = 0;
+      let triggered = false;
+      let na = true;
+      let hasData = false;
+
+      for (const r of results) {
+        const p = planMap.get(r.plan_id);
+        if (p && p.stop_value) {
+          na = false;
+          hasData = true;
+          if (r.sell_price < p.stop_value * (1 - DEVIATION_THRESHOLD)) {
+            triggered = true;
+            const cost = (p.stop_value - r.sell_price) / p.stop_value;
+            const score = Math.min(100, (cost / 0.15) * 100);
+            if (score > maxScore) maxScore = score;
+
+            evidence.push({
+              type: 'plan_field',
+              id: p.id,
+              title: `${p.symbol_code} 止损价`,
+              detail: `stop_price=${p.stop_value}`,
+              ts: p.created_at
+            });
+            evidence.push({
+              type: 'trade',
+              id: r.plan_id,
+              title: `${p.symbol_code} 实际退出价`,
+              detail: `sell_price=${r.sell_price}`,
+              ts: r.closed_at
+            });
+          }
+        }
+      }
+
+      return {
+        key: 'LDC',
+        name: '止损拖延',
+        status: na ? 'na' : (!hasData ? 'insufficient_data' : (triggered ? 'triggered' : 'not_triggered')),
+        score: Math.round(maxScore),
+        metrics: { cost_pct: triggered ? maxScore / 1000 : null },
+        thresholds: { deviation_threshold: DEVIATION_THRESHOLD, hit_epsilon: HIT_EPSILON },
+        summary_line: triggered 
+          ? `本周存在止损拖延，最大额外损失约 ${Math.round(maxScore/6.6)}%。`
+          : "本周未发现明显的止损拖延行为。",
+        evidence: evidence.slice(0, 5)
+      };
+    };
+
+    // --- 4.6 EPC (Sell) ---
+    const calculateEPC = (): WeeklyMetric => {
+      const evidence: Evidence[] = [];
+      let triggered = false;
+      let maxScore = 0;
+      let na = true;
+
+      for (const r of results) {
+        const p = planMap.get(r.plan_id);
+        if (p && (p.target_high || p.exit_plan_target_price)) {
+          na = false;
+          const devEvent = events.find((e: any) => e.plan_id === r.plan_id && e.event_stage === 'exit_deviation');
+          const failEvent = events.find((e: any) => e.plan_id === r.plan_id && e.triggered_exit);
+          
+          if (devEvent && !failEvent) {
+            triggered = true;
+            let score = 30;
+            if (p.target_high) score = 70;
+            if (score > maxScore) maxScore = score;
+
+            evidence.push({
+              type: 'event',
+              id: devEvent.id,
+              title: '卖出执行偏移',
+              detail: devEvent.summary,
+              ts: devEvent.created_at
+            });
+          }
+        }
+      }
+
+      return {
+        key: 'EPC',
+        name: '提前卖出',
+        status: na ? 'na' : (triggered ? 'triggered' : 'not_triggered'),
+        score: maxScore,
+        metrics: {},
+        thresholds: { deviation_threshold: DEVIATION_THRESHOLD, hit_epsilon: HIT_EPSILON },
+        summary_line: triggered 
+          ? "本周存在非计划失效导致的提前卖出行为。"
+          : "本周未发现明显的提前卖出偏离。",
+        evidence
+      };
+    };
+
+    const etnr = calculateETNR();
+    const eldc = calculateELDC();
+    const tnr = calculateTNR();
+    const ldc = calculateLDC();
+    const epc = calculateEPC();
+
+    // --- 4.1 PCS (Plan Consistency Score) ---
+    const calculatePCS = (): WeeklyMetric => {
+      let score = 100;
+      const deductions: Evidence[] = [];
+
+      // 1. Field Integrity
+      for (const p of plans) {
+        if (!p.planned_entry_price) {
+          score -= 2; // Simplified deduction
+          deductions.push({ type: 'plan_field', id: p.id, title: '缺失预算价', detail: p.symbol_code, ts: p.created_at });
+        }
+        if (!p.target_high && !p.exit_plan_target_price) {
+          score -= 2;
+          deductions.push({ type: 'plan_field', id: p.id, title: '缺失卖出目标', detail: p.symbol_code, ts: p.created_at });
+        }
+        if (!p.stop_value) {
+          score -= 2;
+          deductions.push({ type: 'plan_field', id: p.id, title: '缺失止损价', detail: p.symbol_code, ts: p.created_at });
+        }
+      }
+
+      // 2. Consistency Deductions
+      if (etnr.status === 'triggered') score -= Math.min(20, (etnr.score || 0) * 0.2);
+      if (ldc.status === 'triggered') score -= Math.min(30, (ldc.score || 0) * 0.3);
+      if (tnr.status === 'triggered') score -= Math.min(20, (tnr.score || 0) * 0.2);
+      if (epc.status === 'triggered') score -= Math.min(15, (epc.score || 0) * 0.15);
+
+      // 3. Event Handling
+      for (const e of events) {
+        if (e.triggered_exit) {
+          const result = results.find((r: any) => r.plan_id === e.plan_id);
+          if (!result) {
+            score -= 5;
+            deductions.push({ type: 'event', id: e.id, title: '计划失效未卖出', detail: e.summary, ts: e.created_at });
+          }
+        }
+      }
+
+      score = Math.max(0, Math.round(score));
+
+      return {
+        key: 'PCS',
+        name: '计划一致性',
+        status: results.length > 0 ? 'triggered' : 'insufficient_data',
+        score: score,
+        metrics: {},
+        thresholds: { deviation_threshold: DEVIATION_THRESHOLD, hit_epsilon: HIT_EPSILON },
+        summary_line: `本周计划执行一致性评分为 ${score} 分。`,
+        evidence: deductions.slice(0, 5)
+      };
+    };
+
+    const pcs = calculatePCS();
+
+    const metrics = [pcs, etnr, eldc, tnr, ldc, epc];
+    
+    // 5. Calm Conclusion
+    const triggeredMetrics = metrics.filter(m => m.status === 'triggered' && m.key !== 'PCS');
+    triggeredMetrics.sort((a, b) => (b.score || 0) - (a.score || 0));
+    
+    const dominant = triggeredMetrics.length > 0 ? triggeredMetrics[0] : null;
+    let conclusion = "本周执行情况良好，未发现重大纪律偏离。";
+    if (dominant) {
+      conclusion = dominant.summary_line;
+    }
 
     return ok({
-      has_trades: Number((row as any).total_closed || 0) > 0,
-      pcs: (row as any).pcs,
-      main_deviation: (row as any).main_deviation,
-      conclusion_text: (row as any).conclusion_text,
-      tnr_status: (row as any).tnr_status,
-      ldc_status: (row as any).ldc_status,
-      ldc_value: (row as any).ldc_value
+      summary: {
+        total_closed: results.length,
+        dominant_label: dominant ? dominant.name : '无明显偏离',
+        conclusion_text: conclusion,
+      },
+      metrics: metrics
     });
   }
 

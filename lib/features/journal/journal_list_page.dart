@@ -52,6 +52,24 @@ class _JournalListPageState extends ConsumerState<JournalListPage> {
     }
   }
 
+  Future<void> _archivePlan(String planId) async {
+    final l10n = AppLocalizations.of(context)!;
+    try {
+      final apiClient = ref.read(apiClientProvider);
+      await apiClient.archivePlan(planId);
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('已归档')));
+      _refresh();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l10n.tip_submit_failed(e.toString()))),
+      );
+    }
+  }
+
   void _showLanguageSheet(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context)!;
     final currentLocale = ref.read(localeProvider);
@@ -311,6 +329,10 @@ class _JournalListPageState extends ConsumerState<JournalListPage> {
                       ),
                     ),
                     _buildStatusBadge(context, plan.status),
+                    const SizedBox(width: 8),
+                    _buildDeviationBadge(context, plan),
+                    const SizedBox(width: 8),
+                    _buildCardMenu(plan),
                   ],
                 ),
                 const Padding(
@@ -339,6 +361,49 @@ class _JournalListPageState extends ConsumerState<JournalListPage> {
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildCardMenu(PlanListItem plan) {
+    final l10n = AppLocalizations.of(context)!;
+    return PopupMenuButton<String>(
+      icon: const Icon(Icons.more_vert, size: 20, color: AppColors.textWeak),
+      padding: EdgeInsets.zero,
+      onSelected: (v) {
+        if (v == 'archive') {
+          _archivePlan(plan.id);
+        } else if (v == 'detail') {
+          Navigator.of(context)
+              .push(
+                MaterialPageRoute(
+                  builder: (context) => PlanDetailPage(planId: plan.id),
+                ),
+              )
+              .then((_) => _refresh());
+        }
+      },
+      itemBuilder: (context) => [
+        PopupMenuItem(
+          value: 'archive',
+          child: Row(
+            children: [
+              const Icon(Icons.archive_outlined, size: 18),
+              const SizedBox(width: 8),
+              Text(l10n.action_archive),
+            ],
+          ),
+        ),
+        PopupMenuItem(
+          value: 'detail',
+          child: Row(
+            children: [
+              const Icon(Icons.description_outlined, size: 18),
+              const SizedBox(width: 8),
+              Text(l10n.action_view_detail),
+            ],
+          ),
+        ),
+      ],
     );
   }
 
@@ -382,6 +447,44 @@ class _JournalListPageState extends ConsumerState<JournalListPage> {
           fontSize: 11,
           fontWeight: FontWeight.bold,
         ),
+      ),
+    );
+  }
+
+  Widget _buildDeviationBadge(BuildContext context, PlanListItem plan) {
+    final l10n = AppLocalizations.of(context)!;
+    final deviation = plan.entryDeviationPct;
+    if (deviation == null) return const SizedBox.shrink();
+
+    final hasDeviation = deviation.abs() > 0.01;
+    final color = hasDeviation ? Colors.amber : Colors.grey;
+    final label = hasDeviation ? l10n.badge_deviation : l10n.badge_no_deviation;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: color.withAlpha(20),
+        borderRadius: BorderRadius.circular(4),
+        border: Border.all(color: color.withAlpha(100)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            hasDeviation ? Icons.circle : Icons.circle_outlined,
+            size: 8,
+            color: color,
+          ),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: TextStyle(
+              color: color,
+              fontSize: 10,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
       ),
     );
   }

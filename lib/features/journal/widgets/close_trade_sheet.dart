@@ -22,12 +22,16 @@ class CloseTradeSheet extends ConsumerStatefulWidget {
 class _CloseTradeSheetState extends ConsumerState<CloseTradeSheet> {
   final _formKey = GlobalKey<FormState>();
   final _priceController = TextEditingController();
+  final _postExitPriceController = TextEditingController();
+  final _targetPriceController = TextEditingController();
   String _sellReason = 'follow_plan';
   bool _isSubmitting = false;
 
   @override
   void dispose() {
     _priceController.dispose();
+    _postExitPriceController.dispose();
+    _targetPriceController.dispose();
     super.dispose();
   }
 
@@ -42,6 +46,8 @@ class _CloseTradeSheetState extends ConsumerState<CloseTradeSheet> {
         ClosePlanRequest(
           sellPrice: double.parse(_priceController.text),
           sellReason: _sellReason,
+          postExitBestPrice: double.tryParse(_postExitPriceController.text),
+          exitPlanTargetPrice: double.tryParse(_targetPriceController.text),
         ),
       );
       if (!mounted) return;
@@ -138,6 +144,37 @@ class _CloseTradeSheetState extends ConsumerState<CloseTradeSheet> {
               _buildReasonRadio('panic', '恐慌'),
               _buildReasonRadio('external', '外力干扰'),
               _buildReasonRadio('other', '其他'),
+              const SizedBox(height: 20),
+              const Text(
+                'EPC 数据补全（可选）',
+                style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 8),
+              TextFormField(
+                controller: _postExitPriceController,
+                decoration: const InputDecoration(
+                  labelText: '卖出后观察期最优价',
+                  hintText: '用于计算 EPC 成本',
+                  border: OutlineInputBorder(),
+                  prefixText: '¥ ',
+                ),
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: _targetPriceController,
+                decoration: const InputDecoration(
+                  labelText: '原计划卖出目标价',
+                  hintText: '若原计划未设定，可在此补填',
+                  border: OutlineInputBorder(),
+                  prefixText: '¥ ',
+                ),
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                ),
+              ),
               const SizedBox(height: 24),
               SizedBox(
                 width: double.infinity,

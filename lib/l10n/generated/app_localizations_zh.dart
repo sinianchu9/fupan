@@ -527,4 +527,301 @@ class AppLocalizationsZh extends AppLocalizations {
   String label_time_take_profit_condition(int days) {
     return '• 时间止盈条件：$days 天（从建计划开始计）';
   }
+
+  @override
+  String get title_calm_conclusion => '冷静结论';
+
+  @override
+  String get label_entry_deviation => '建仓偏离';
+
+  @override
+  String get label_entry_driver => '建仓驱动 (可选)';
+
+  @override
+  String get label_no_deviation => '本次建仓严格按原计划价格执行';
+
+  @override
+  String label_deviation_fact(Object direction, Object percent) {
+    return '本次交易中，实际建仓价 $direction 原预算价 $percent%';
+  }
+
+  @override
+  String label_driver_fact(Object driver) {
+    return '建仓时记录的主要驱动为：$driver';
+  }
+
+  @override
+  String get label_plan_vs_actual => '原计划 vs 实际执行';
+
+  @override
+  String get label_planned_range => '原计划建仓区间';
+
+  @override
+  String get label_actual_price => '实际建仓价格';
+
+  @override
+  String get label_deviation_direction => '偏离方向';
+
+  @override
+  String get label_direction_up => '上移';
+
+  @override
+  String get label_direction_down => '下移';
+
+  @override
+  String get label_direction_none => '无偏离';
+
+  @override
+  String get label_result_correlation => '结果关联';
+
+  @override
+  String get label_loss_with_deviation => '本次交易为亏损交易，且存在建仓偏离';
+
+  @override
+  String get label_profit_with_deviation => '本次交易为盈利交易，但存在建仓偏离';
+
+  @override
+  String get label_loss_no_deviation => '本次交易为亏损交易，执行与计划一致';
+
+  @override
+  String get label_profit_no_deviation => '本次交易为盈利交易，执行与计划一致';
+
+  @override
+  String get label_calm_summary_deviation =>
+      '本次交易中，计划与执行出现偏移，建议在后续复盘中关注该类情境的重复出现频率。';
+
+  @override
+  String get label_calm_summary_no_deviation => '本次交易执行过程与原计划一致。';
+
+  @override
+  String get driver_fomo => '担心错过行情 (FOMO)';
+
+  @override
+  String get driver_plan_weakened => '计划逻辑弱化';
+
+  @override
+  String get driver_market_change => '市场环境突变';
+
+  @override
+  String get driver_wait_failed => '等待耐心耗尽';
+
+  @override
+  String get driver_emotion => '情绪波动';
+
+  @override
+  String get driver_other => '其他';
+
+  @override
+  String get badge_deviation => '有建仓偏离';
+
+  @override
+  String get badge_no_deviation => '按计划执行';
+
+  @override
+  String get label_event_stage => '事件阶段';
+
+  @override
+  String get label_behavior_driver => '行为驱动';
+
+  @override
+  String get label_price_at_event => '事件发生价';
+
+  @override
+  String get stage_entry_deviation => '建仓执行偏移';
+
+  @override
+  String get stage_entry_non_action => '低位未执行';
+
+  @override
+  String get stage_exit_deviation => '卖出执行偏移';
+
+  @override
+  String get stage_stoploss_deviation => '止损执行偏移';
+
+  @override
+  String get stage_external_change => '外部环境变化';
+
+  @override
+  String get label_epc => 'EPC';
+
+  @override
+  String label_epc_fact(String pct) {
+    return '提前卖出后，价格继续向原目标方向发展，形成约 $pct% 的提前卖出机会成本 (EPC)。';
+  }
+
+  @override
+  String get label_exit_triggered_by_event => '本次卖出由计划失效事件触发，不计入提前卖出成本。';
+
+  @override
+  String get label_epc_summary => '本次交易中，卖出行为与原计划目标存在偏离，该类情境可在后续复盘中关注其重复出现情况。';
+
+  @override
+  String get driver_early_profit => '提前兑现，降低不确定性';
+
+  @override
+  String get driver_fear_drawdown => '无法承受回撤';
+
+  @override
+  String get driver_emotion_fear => '情绪性卖出（恐惧/犹豫）';
+
+  @override
+  String get driver_lower_target => '临时降低目标';
+
+  @override
+  String get driver_fomo_short => '追高 (FOMO)';
+
+  @override
+  String get driver_fear => '恐慌 (Fear)';
+
+  @override
+  String get driver_wait_failed_short => '耐心耗尽';
+
+  @override
+  String get driver_logic_broken => '逻辑破坏';
+
+  @override
+  String get driver_market_crash => '市场崩盘';
+
+  @override
+  String get driver_profit_protect => '利润保护';
+
+  @override
+  String get driver_revenge => '报复性交易';
+
+  @override
+  String get driver_other_short => '其他';
+
+  @override
+  String get label_missed_price => '错过价格';
+
+  @override
+  String get label_deviation_price => '偏离价格';
+
+  @override
+  String get label_etnr => 'E-TNR (追高成本)';
+
+  @override
+  String get label_eldc => 'E-LDC (低位未买成本)';
+
+  @override
+  String get label_tnr => 'TNR (到位未卖成本)';
+
+  @override
+  String get label_ldc => 'LDC (止损延迟成本)';
+
+  @override
+  String get title_add_event => '新增事件';
+
+  @override
+  String get label_event_summary => '事件摘要';
+
+  @override
+  String get label_triggered_exit => '触发退出条件';
+
+  @override
+  String get btn_submit_event => '提交事件';
+
+  @override
+  String get label_plan_consistency_desc => '计划一致性';
+
+  @override
+  String get label_etnr_desc => '买入追高成本';
+
+  @override
+  String get label_eldc_desc => '低位不执行成本';
+
+  @override
+  String get label_tnr_desc => '到位不卖';
+
+  @override
+  String get label_ldc_desc => '止损拖延';
+
+  @override
+  String get label_epc_desc => '提前卖出成本';
+
+  @override
+  String get tip_entry_deviation_hint => '检测到建仓价格偏离，请记录驱动因素';
+
+  @override
+  String get label_audit_metrics => '核心纪律指标';
+
+  @override
+  String get label_evidence_chain => '证据链 (Evidence Chain)';
+
+  @override
+  String get label_improvement_tips => '本周改进提示';
+
+  @override
+  String get label_quantitative_results => '量化结果';
+
+  @override
+  String get label_weekly_conclusion => '本周结论';
+
+  @override
+  String get label_deviation_score => '偏离分数';
+
+  @override
+  String get label_deviation_magnitude => '偏离幅度';
+
+  @override
+  String get label_trigger_threshold => '触发阈值';
+
+  @override
+  String get tip_score_explanation => '注：分数代表偏离强度，不代表好坏。分数越高表示偏离计划程度越大。';
+
+  @override
+  String get tip_no_evidence => '暂无直接证据';
+
+  @override
+  String get status_triggered => '发生';
+
+  @override
+  String get status_not_triggered => '未发生';
+
+  @override
+  String get status_na => '不适用';
+
+  @override
+  String get status_insufficient_data => '数据不足';
+
+  @override
+  String label_evidence_count(int count) {
+    return '证据 $count 条';
+  }
+
+  @override
+  String get label_event_type => '事件类型';
+
+  @override
+  String get label_impact_target => '影响对象';
+
+  @override
+  String get type_logic_broken => '逻辑证伪';
+
+  @override
+  String get type_forced => '强制扰动';
+
+  @override
+  String get type_verify => '验证兑现';
+
+  @override
+  String get type_structure_change => '结构变化';
+
+  @override
+  String get target_buy => '建仓';
+
+  @override
+  String get target_hold => '加仓持仓';
+
+  @override
+  String get target_sell => '卖出';
+
+  @override
+  String get target_stop => '止损';
+
+  @override
+  String get hint_summary_fact_only => '只写事实，不写解释（最多40字）';
+
+  @override
+  String get label_event_explain => '记录已发生且会影响计划是否继续成立的事实证据。';
 }

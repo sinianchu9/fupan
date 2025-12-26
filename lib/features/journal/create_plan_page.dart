@@ -155,7 +155,7 @@ class _CreatePlanPageState extends ConsumerState<CreatePlanPage> {
         'stop_time_days': _stopType == 'time'
             ? int.tryParse(_stopTimeDaysController.text)
             : null,
-        'entry_price': double.tryParse(_entryPriceController.text),
+        'planned_entry_price': double.tryParse(_entryPriceController.text),
       };
 
       await apiClient.createPlan(data);

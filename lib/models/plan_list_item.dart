@@ -7,6 +7,10 @@ class PlanListItem {
   final double targetHigh;
   final int createdAt;
   final int updatedAt;
+  final double? entryPrice;
+  final double? plannedEntryPrice;
+  final double? actualEntryPrice;
+  final String? entryDriver;
   final String symbolCode;
   final String symbolName;
   final String symbolIndustry;
@@ -21,6 +25,10 @@ class PlanListItem {
     required this.targetHigh,
     required this.createdAt,
     required this.updatedAt,
+    this.entryPrice,
+    this.plannedEntryPrice,
+    this.actualEntryPrice,
+    this.entryDriver,
     required this.symbolCode,
     required this.symbolName,
     required this.symbolIndustry,
@@ -37,11 +45,24 @@ class PlanListItem {
       targetHigh: (json['target_high'] as num).toDouble(),
       createdAt: json['created_at'],
       updatedAt: json['updated_at'],
+      entryPrice: json['entry_price']?.toDouble(),
+      plannedEntryPrice: json['planned_entry_price']?.toDouble(),
+      actualEntryPrice: json['actual_entry_price']?.toDouble(),
+      entryDriver: json['entry_driver'],
       symbolCode: json['symbol_code'],
       symbolName: json['symbol_name'],
       symbolIndustry: json['symbol_industry'] ?? '未分类',
       isArchived: _parseBool(json['is_archived']),
     );
+  }
+
+  double? get entryDeviationPct {
+    if (plannedEntryPrice == null ||
+        actualEntryPrice == null ||
+        plannedEntryPrice! <= 0) {
+      return null;
+    }
+    return (actualEntryPrice! - plannedEntryPrice!) / plannedEntryPrice!;
   }
 
   static bool _parseBool(dynamic value) {

@@ -7,13 +7,14 @@ import '../../core/theme.dart';
 import '../../models/plan_detail.dart';
 import '../../models/plan_edit.dart';
 import '../../models/plan_detail_response.dart';
+import '../../models/close_plan_request.dart';
 import 'self_assessment_page.dart';
 import 'widgets/plan_compare_card.dart';
 import 'widgets/events_timeline_card.dart';
 import 'widgets/add_event_sheet.dart';
 import 'widgets/revise_target_sheet.dart';
 import 'widgets/result_card.dart';
-import '../../models/close_plan_request.dart';
+import 'widgets/calm_conclusion_card.dart';
 
 class PlanDetailPage extends ConsumerStatefulWidget {
   final String planId;
@@ -55,9 +56,123 @@ class _PlanDetailPageState extends ConsumerState<PlanDetailPage> {
 
   Future<void> _armPlan(String planId) async {
     final l10n = AppLocalizations.of(context)!;
+    final priceController = TextEditingController();
+    String? selectedDriver;
+
+    final result = await showDialog<Map<String, dynamic>>(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) {
+          final price = double.tryParse(priceController.text) ?? 0;
+          final plannedPrice =
+              _data?.plan.plannedEntryPrice ?? _data?.plan.entryPrice ?? 0;
+          double deviation = 0;
+          if (plannedPrice > 0 && price > 0) {
+            // Long-only: only positive if price is HIGHER than planned
+            deviation = (price - plannedPrice) / plannedPrice;
+          }
+          final showDriver = deviation > 0.01;
+          final devPercent = (deviation * 100).toStringAsFixed(1);
+
+          return AlertDialog(
+            title: Text(l10n.action_arm),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  TextField(
+                    controller: priceController,
+                    decoration: InputDecoration(
+                      labelText: l10n.label_close_price,
+                      hintText: l10n.hint_close_price,
+                      helperText:
+                          '当前偏离: $devPercent% ${showDriver ? "(" + l10n.tip_entry_deviation_hint + ")" : ""}',
+                      helperStyle: TextStyle(
+                        color: showDriver ? Colors.orange : Colors.grey,
+                        fontSize: 12,
+                      ),
+                    ),
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
+                    onChanged: (_) => setState(() {}),
+                  ),
+                  if (showDriver) ...[
+                    const SizedBox(height: 16),
+                    DropdownButtonFormField<String>(
+                      decoration: InputDecoration(
+                        labelText: l10n.label_entry_driver,
+                      ),
+                      value: selectedDriver,
+                      items: [
+                        DropdownMenuItem(
+                          value: 'fomo',
+                          child: Text(l10n.driver_fomo),
+                        ),
+                        DropdownMenuItem(
+                          value: 'plan_weakened',
+                          child: Text(l10n.driver_plan_weakened),
+                        ),
+                        DropdownMenuItem(
+                          value: 'market_change',
+                          child: Text(l10n.driver_market_change),
+                        ),
+                        DropdownMenuItem(
+                          value: 'wait_failed',
+                          child: Text(l10n.driver_wait_failed),
+                        ),
+                        DropdownMenuItem(
+                          value: 'emotion',
+                          child: Text(l10n.driver_emotion),
+                        ),
+                        DropdownMenuItem(
+                          value: 'other',
+                          child: Text(l10n.driver_other),
+                        ),
+                      ],
+                      onChanged: (v) => setState(() => selectedDriver = v),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: Text(l10n.action_back),
+              ),
+              ElevatedButton(
+                onPressed: () {
+                  final p = double.tryParse(priceController.text);
+                  if (p != null) {
+                    Navigator.pop(context, {
+                      'price': p,
+                      'driver': selectedDriver,
+                    });
+                  } else {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text(l10n.tip_invalid_price)),
+                    );
+                  }
+                },
+                child: Text(l10n.action_confirm),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+
+    if (result == null) return;
+
     try {
       final apiClient = ref.read(apiClientProvider);
-      await apiClient.armPlan(planId);
+      await apiClient.armPlan(
+        planId,
+        actualEntryPrice: result['price'],
+        entryDriver: result['driver'],
+      );
       if (!mounted) return;
       ScaffoldMessenger.of(
         context,
@@ -66,7 +181,25 @@ class _PlanDetailPageState extends ConsumerState<PlanDetailPage> {
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l10n.tip_fetch_failed(e.toString()))),
+        SnackBar(content: Text(l10n.tip_submit_failed(e.toString()))),
+      );
+    }
+  }
+
+  Future<void> _archivePlan(String planId) async {
+    final l10n = AppLocalizations.of(context)!;
+    try {
+      final apiClient = ref.read(apiClientProvider);
+      await apiClient.archivePlan(planId);
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('已归档')));
+      Navigator.pop(context, true);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l10n.tip_submit_failed(e.toString()))),
       );
     }
   }
@@ -122,6 +255,13 @@ class _PlanDetailPageState extends ConsumerState<PlanDetailPage> {
     return Scaffold(
       appBar: AppBar(
         title: Text('${plan.symbolCode} ${l10n.title_plan_detail}'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.archive_outlined),
+            tooltip: l10n.action_archive,
+            onPressed: () => _archivePlan(plan.id),
+          ),
+        ],
       ),
       body: SingleChildScrollView(
         child: Column(
@@ -133,7 +273,16 @@ class _PlanDetailPageState extends ConsumerState<PlanDetailPage> {
                   _buildSummaryCard(context, plan),
                   const SizedBox(height: 16),
                   if (_data!.result != null) ...[
-                    ResultCard(result: _data!.result!),
+                    CalmConclusionCard(
+                      plan: plan,
+                      result: _data!.result,
+                      events: _data!.events,
+                    ),
+                    const SizedBox(height: 16),
+                    ResultCard(
+                      result: _data!.result!,
+                      actualEntryPrice: plan.actualEntryPrice,
+                    ),
                     const SizedBox(height: 16),
                   ],
                   _buildOriginalPlanCard(context, plan),
@@ -336,11 +485,17 @@ class _PlanDetailPageState extends ConsumerState<PlanDetailPage> {
               l10n.label_stop_logic,
               '${plan.stopType}: ${plan.stopValue ?? plan.stopTimeDays ?? "-"}',
             ),
-            if (plan.entryPrice != null)
+            if (plan.plannedEntryPrice != null)
               _buildDetailRow(
                 context,
                 l10n.label_entry_price,
-                plan.entryPrice.toString(),
+                plan.plannedEntryPrice.toString(),
+              ),
+            if (plan.actualEntryPrice != null)
+              _buildDetailRow(
+                context,
+                l10n.label_close_price,
+                plan.actualEntryPrice.toString(),
               ),
           ],
         ),

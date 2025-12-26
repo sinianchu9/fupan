@@ -89,7 +89,11 @@ CREATE TABLE IF NOT EXISTS trade_plans (
   stop_time_days INTEGER,         -- 时间止损（可空）
 
   -- 执行辅助（MVP）
-  entry_price REAL,               -- 可空：买入均价
+  entry_price REAL,               -- 兼容字段：旧数据或映射
+  planned_entry_price REAL,       -- 计划买入价（草稿阶段）
+  actual_entry_price REAL,        -- 实际成交均价（建仓后）
+  entry_driver TEXT,              -- 建仓驱动因素（fomo, market_change等）
+  exit_plan_target_price REAL,    -- 计划卖出目标价（EPC计算用）
   created_at INTEGER NOT NULL DEFAULT (unixepoch()),
   updated_at INTEGER NOT NULL DEFAULT (unixepoch())
 );
@@ -118,9 +122,12 @@ CREATE TABLE IF NOT EXISTS trade_events (
   id TEXT PRIMARY KEY,
   plan_id TEXT NOT NULL,
   user_id TEXT NOT NULL,
-  event_type TEXT NOT NULL,       -- falsify / forced / verify / structure
+  event_type TEXT NOT NULL,       -- falsify / forced / verify / structure (legacy)
+  event_stage TEXT,               -- entry_deviation / entry_non_action / exit_deviation / stoploss_deviation / external_change
+  behavior_driver TEXT,           -- fomo, fear, wait_failed, etc.
+  price_at_event REAL,            -- 发生时的价格
   summary TEXT NOT NULL,          -- ≤40字
-  impact_target TEXT NOT NULL,    -- buy_logic / sell_logic / stop_loss
+  impact_target TEXT NOT NULL,    -- buy_logic / sell_logic / stop_loss (legacy)
   triggered_exit INTEGER NOT NULL DEFAULT 0, -- 0/1
   created_at INTEGER NOT NULL DEFAULT (unixepoch()),
   FOREIGN KEY (plan_id) REFERENCES trade_plans(id) ON DELETE CASCADE
@@ -136,6 +143,8 @@ CREATE TABLE IF NOT EXISTS trade_results (
   sell_reason TEXT NOT NULL,        -- JSON string or enum
   system_judgement TEXT NOT NULL,   -- no_plan / follow_plan / exec_error / judge_error / emotion_override
   conclusion_text TEXT NOT NULL,
+  post_exit_best_price REAL,      -- 卖出后观察期内最优价格
+  epc_opportunity_pct REAL,       -- EPC 成本百分比
   closed_at INTEGER NOT NULL DEFAULT (unixepoch()),
   FOREIGN KEY (plan_id) REFERENCES trade_plans(id) ON DELETE CASCADE
 );

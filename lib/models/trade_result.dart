@@ -5,6 +5,8 @@ class TradeResult {
   final String systemJudgement;
   final String conclusionText;
   final int closedAt;
+  final double? postExitBestPrice;
+  final double? epcOpportunityPct;
 
   TradeResult({
     required this.planId,
@@ -13,6 +15,8 @@ class TradeResult {
     required this.systemJudgement,
     required this.conclusionText,
     required this.closedAt,
+    this.postExitBestPrice,
+    this.epcOpportunityPct,
   });
 
   factory TradeResult.fromJson(Map<String, dynamic> json) {
@@ -23,6 +27,8 @@ class TradeResult {
       systemJudgement: json['system_judgement'],
       conclusionText: json['conclusion_text'],
       closedAt: json['closed_at'],
+      postExitBestPrice: json['post_exit_best_price']?.toDouble(),
+      epcOpportunityPct: json['epc_opportunity_pct']?.toDouble(),
     );
   }
 

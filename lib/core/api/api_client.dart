@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 import '../../models/add_event_request.dart';
 import '../../models/close_plan_request.dart';
 import '../../models/close_plan_response.dart';
+import '../../models/weekly_report.dart';
 import '../session/user_session.dart';
 
 class ApiClient {
@@ -91,8 +92,18 @@ class ApiClient {
     return response.data;
   }
 
-  Future<void> armPlan(String planId) async {
-    await post('/plans/$planId/arm');
+  Future<void> armPlan(
+    String planId, {
+    double? actualEntryPrice,
+    String? entryDriver,
+  }) async {
+    await post(
+      '/plans/$planId/arm',
+      data: {
+        if (actualEntryPrice != null) 'actual_entry_price': actualEntryPrice,
+        if (entryDriver != null) 'entry_driver': entryDriver,
+      },
+    );
   }
 
   Future<void> updatePlan(String planId, Map<String, dynamic> patch) async {
@@ -131,9 +142,9 @@ class ApiClient {
     await post('/plans/$planId/unarchive');
   }
 
-  Future<Map<String, dynamic>> getWeeklyReport() async {
+  Future<WeeklyReport> getWeeklyReport() async {
     final response = await get('/report/weekly');
-    return response.data;
+    return WeeklyReport.fromJson(response.data);
   }
 
   // ---- self reviews (Step 7) ----

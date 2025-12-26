@@ -17,6 +17,10 @@ class PlanDetail {
   final double? stopValue;
   final int? stopTimeDays;
   final double? entryPrice;
+  final double? plannedEntryPrice;
+  final double? actualEntryPrice;
+  final String? entryDriver;
+  final double? exitPlanTargetPrice;
   final int createdAt;
   final int updatedAt;
   final String symbolCode;
@@ -41,6 +45,10 @@ class PlanDetail {
     this.stopValue,
     this.stopTimeDays,
     this.entryPrice,
+    this.plannedEntryPrice,
+    this.actualEntryPrice,
+    this.entryDriver,
+    this.exitPlanTargetPrice,
     required this.createdAt,
     required this.updatedAt,
     required this.symbolCode,
@@ -67,6 +75,10 @@ class PlanDetail {
       stopValue: json['stop_value']?.toDouble(),
       stopTimeDays: json['stop_time_days'],
       entryPrice: json['entry_price']?.toDouble(),
+      plannedEntryPrice: json['planned_entry_price']?.toDouble(),
+      actualEntryPrice: json['actual_entry_price']?.toDouble(),
+      entryDriver: json['entry_driver'],
+      exitPlanTargetPrice: json['exit_plan_target_price']?.toDouble(),
       createdAt: json['created_at'],
       updatedAt: json['updated_at'],
       symbolCode: json['symbol_code'] ?? '',
@@ -74,6 +86,15 @@ class PlanDetail {
       symbolIndustry: json['symbol_industry'] ?? '未分类',
       isArchived: _parseBool(json['is_archived']),
     );
+  }
+
+  double? get entryDeviationPct {
+    final basePrice = plannedEntryPrice ?? entryPrice;
+    if (basePrice == null || actualEntryPrice == null || basePrice <= 0) {
+      return null;
+    }
+    // Only handle long deviation (buying higher than planned)
+    return (actualEntryPrice! - basePrice) / basePrice;
   }
 
   static bool _parseBool(dynamic value) {

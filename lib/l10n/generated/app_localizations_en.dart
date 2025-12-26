@@ -534,4 +534,313 @@ class AppLocalizationsEn extends AppLocalizations {
   String label_time_take_profit_condition(int days) {
     return '• Time Take Profit: $days days (from plan creation)';
   }
+
+  @override
+  String get title_calm_conclusion => 'Calm Conclusion';
+
+  @override
+  String get label_entry_deviation => 'Entry Deviation';
+
+  @override
+  String get label_entry_driver => 'Entry Driver (Optional)';
+
+  @override
+  String get label_no_deviation =>
+      'This entry strictly followed the original plan price.';
+
+  @override
+  String label_deviation_fact(Object direction, Object percent) {
+    return 'In this trade, the actual entry price moved $direction by $percent% from the original budget.';
+  }
+
+  @override
+  String label_driver_fact(Object driver) {
+    return 'The main driver recorded at entry was: $driver';
+  }
+
+  @override
+  String get label_plan_vs_actual => 'Original Plan vs Actual Execution';
+
+  @override
+  String get label_planned_range => 'Original Planned Range';
+
+  @override
+  String get label_actual_price => 'Actual Entry Price';
+
+  @override
+  String get label_deviation_direction => 'Deviation Direction';
+
+  @override
+  String get label_direction_up => 'Upward';
+
+  @override
+  String get label_direction_down => 'Downward';
+
+  @override
+  String get label_direction_none => 'No Deviation';
+
+  @override
+  String get label_result_correlation => 'Result Correlation';
+
+  @override
+  String get label_loss_with_deviation =>
+      'This was a losing trade with entry deviation.';
+
+  @override
+  String get label_profit_with_deviation =>
+      'This was a profitable trade but with entry deviation.';
+
+  @override
+  String get label_loss_no_deviation =>
+      'This was a losing trade, execution consistent with plan.';
+
+  @override
+  String get label_profit_no_deviation =>
+      'This was a profitable trade, execution consistent with plan.';
+
+  @override
+  String get label_calm_summary_deviation =>
+      'In this trade, plan and execution deviated. It is recommended to monitor the recurrence frequency of such scenarios in subsequent reviews.';
+
+  @override
+  String get label_calm_summary_no_deviation =>
+      'The execution process of this trade was consistent with the original plan.';
+
+  @override
+  String get driver_fomo => 'Fear Of Missing Out (FOMO)';
+
+  @override
+  String get driver_plan_weakened => 'Plan logic weakened';
+
+  @override
+  String get driver_market_change => 'Sudden market environment change';
+
+  @override
+  String get driver_wait_failed => 'Patience exhausted while waiting';
+
+  @override
+  String get driver_emotion => 'Emotional fluctuations';
+
+  @override
+  String get driver_other => 'Other';
+
+  @override
+  String get badge_deviation => 'Entry Deviation';
+
+  @override
+  String get badge_no_deviation => 'Followed Plan';
+
+  @override
+  String get label_event_stage => 'Event Stage';
+
+  @override
+  String get label_behavior_driver => 'Behavior Driver';
+
+  @override
+  String get label_price_at_event => 'Price at Event';
+
+  @override
+  String get stage_entry_deviation => 'Entry Execution Deviation';
+
+  @override
+  String get stage_entry_non_action => 'Low Entry Not Executed';
+
+  @override
+  String get stage_exit_deviation => 'Exit Execution Deviation';
+
+  @override
+  String get stage_stoploss_deviation => 'Stop Loss Execution Deviation';
+
+  @override
+  String get stage_external_change => 'External Environment Change';
+
+  @override
+  String get label_epc => 'EPC';
+
+  @override
+  String label_epc_fact(String pct) {
+    return 'After selling early, the price continued to move in the original target direction, forming an Early Profit Cut (EPC) opportunity cost of approximately $pct%.';
+  }
+
+  @override
+  String get label_exit_triggered_by_event =>
+      'This exit was triggered by a plan invalidation event and is not counted as an early sell cost.';
+
+  @override
+  String get label_epc_summary =>
+      'In this trade, the exit behavior deviated from the original plan target. This type of scenario can be monitored for recurrence in future reviews.';
+
+  @override
+  String get driver_early_profit => 'Take profit early to reduce uncertainty';
+
+  @override
+  String get driver_fear_drawdown => 'Cannot tolerate drawdown';
+
+  @override
+  String get driver_emotion_fear => 'Emotional selling (fear/hesitation)';
+
+  @override
+  String get driver_lower_target => 'Temporarily lowered target';
+
+  @override
+  String get driver_fomo_short => 'Chasing high (FOMO)';
+
+  @override
+  String get driver_fear => 'Panic (Fear)';
+
+  @override
+  String get driver_wait_failed_short => 'Patience exhausted';
+
+  @override
+  String get driver_logic_broken => 'Logic broken';
+
+  @override
+  String get driver_market_crash => 'Market crash';
+
+  @override
+  String get driver_profit_protect => 'Profit protection';
+
+  @override
+  String get driver_revenge => 'Revenge trading';
+
+  @override
+  String get driver_other_short => 'Other';
+
+  @override
+  String get label_missed_price => 'Missed Price';
+
+  @override
+  String get label_deviation_price => 'Deviation Price';
+
+  @override
+  String get label_etnr => 'E-TNR (Chasing Cost)';
+
+  @override
+  String get label_eldc => 'E-LDC (Low Entry Missed Cost)';
+
+  @override
+  String get label_tnr => 'TNR (Target Not Sold Cost)';
+
+  @override
+  String get label_ldc => 'LDC (Stop Loss Delay Cost)';
+
+  @override
+  String get title_add_event => 'Add Event';
+
+  @override
+  String get label_event_summary => 'Event Summary';
+
+  @override
+  String get label_triggered_exit => 'Triggered Exit Condition';
+
+  @override
+  String get btn_submit_event => 'Submit Event';
+
+  @override
+  String get label_plan_consistency_desc => 'Plan Consistency';
+
+  @override
+  String get label_etnr_desc => 'Chasing Cost';
+
+  @override
+  String get label_eldc_desc => 'Low Entry Missed Cost';
+
+  @override
+  String get label_tnr_desc => 'Target Not Sold Cost';
+
+  @override
+  String get label_ldc_desc => 'Stop Loss Delay Cost';
+
+  @override
+  String get label_epc_desc => 'Early Profit Cut Cost';
+
+  @override
+  String get tip_entry_deviation_hint =>
+      'Entry price deviation detected, please record the driver';
+
+  @override
+  String get label_audit_metrics => 'Core Discipline Metrics';
+
+  @override
+  String get label_evidence_chain => 'Evidence Chain';
+
+  @override
+  String get label_improvement_tips => 'Improvement Tips';
+
+  @override
+  String get label_quantitative_results => 'Quantitative Results';
+
+  @override
+  String get label_weekly_conclusion => 'Weekly Conclusion';
+
+  @override
+  String get label_deviation_score => 'Deviation Score';
+
+  @override
+  String get label_deviation_magnitude => 'Deviation Magnitude';
+
+  @override
+  String get label_trigger_threshold => 'Trigger Threshold';
+
+  @override
+  String get tip_score_explanation =>
+      'Note: Score represents deviation intensity, not quality. Higher score means greater deviation from plan.';
+
+  @override
+  String get tip_no_evidence => 'No direct evidence yet';
+
+  @override
+  String get status_triggered => 'Triggered';
+
+  @override
+  String get status_not_triggered => 'Not Triggered';
+
+  @override
+  String get status_na => 'N/A';
+
+  @override
+  String get status_insufficient_data => 'Insufficient Data';
+
+  @override
+  String label_evidence_count(int count) {
+    return '$count Evidence';
+  }
+
+  @override
+  String get label_event_type => 'Event Type';
+
+  @override
+  String get label_impact_target => 'Impact Target';
+
+  @override
+  String get type_logic_broken => 'Logic Broken';
+
+  @override
+  String get type_forced => 'Forced Disturbance';
+
+  @override
+  String get type_verify => 'Verification';
+
+  @override
+  String get type_structure_change => 'Structure Change';
+
+  @override
+  String get target_buy => 'Entry';
+
+  @override
+  String get target_hold => 'Hold/Add';
+
+  @override
+  String get target_sell => 'Exit';
+
+  @override
+  String get target_stop => 'Stop Loss';
+
+  @override
+  String get hint_summary_fact_only =>
+      'Facts only, no explanation (max 40 chars)';
+
+  @override
+  String get label_event_explain =>
+      'Record factual evidence that affects whether the plan remains valid.';
 }

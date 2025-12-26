@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:fupan/l10n/generated/app_localizations.dart';
 import '../../core/providers.dart';
 import '../../core/theme.dart';
+import '../../models/weekly_report.dart';
+import 'weekly_metric_detail_page.dart';
 
 class WeeklyReportPage extends ConsumerStatefulWidget {
   const WeeklyReportPage({super.key});
@@ -13,7 +15,7 @@ class WeeklyReportPage extends ConsumerStatefulWidget {
 
 class _WeeklyReportPageState extends ConsumerState<WeeklyReportPage> {
   bool _isLoading = true;
-  Map<String, dynamic>? _report;
+  WeeklyReport? _report;
 
   @override
   void initState() {
@@ -52,10 +54,10 @@ class _WeeklyReportPageState extends ConsumerState<WeeklyReportPage> {
               child: ListView(
                 padding: const EdgeInsets.symmetric(
                   horizontal: 20,
-                  vertical: 32,
+                  vertical: 24,
                 ),
                 children: [
-                  if (_report?['has_trades'] == false)
+                  if (_report != null && _report!.summary.totalClosed == 0)
                     Container(
                       padding: const EdgeInsets.all(16),
                       margin: const EdgeInsets.only(bottom: 24),
@@ -75,55 +77,19 @@ class _WeeklyReportPageState extends ConsumerState<WeeklyReportPage> {
                       ),
                     ),
 
-                  _buildReportCard([
-                    _buildReportLine(
-                      l10n.label_pcs_score,
-                      _report?['has_trades'] == true
-                          ? '${_report?['pcs']}'
-                          : l10n.label_no_trades,
-                      isGold: true,
-                    ),
-                    const Divider(height: 48),
-                    _buildReportLine(
-                      l10n.label_main_deviation,
-                      _getDeviationDisplay(context, _report?['main_deviation']),
-                    ),
-                    const Divider(height: 48),
-                    _buildReportLine(
-                      l10n.label_conclusion,
-                      _report?['has_trades'] == true
-                          ? (_report?['conclusion_text'] ?? l10n.label_none)
-                          : l10n.label_none,
-                      isLongText: true,
-                    ),
-                    const Divider(height: 48),
-                    _buildReportLine(
-                      l10n.label_tnr_ldc,
-                      _getTnrLdcDisplay(context, _report),
-                      isWrap: true,
-                    ),
-                  ]),
+                  if (_report != null) ...[
+                    _buildSummaryCard(context, _report!.summary),
+                    const SizedBox(height: 24),
+                    _buildMetricList(context, _report!.metrics),
+                  ],
                 ],
               ),
             ),
     );
   }
 
-  String _getTnrLdcDisplay(BuildContext context, Map<String, dynamic>? report) {
+  Widget _buildSummaryCard(BuildContext context, WeeklySummary summary) {
     final l10n = AppLocalizations.of(context)!;
-    if (report == null) return '-';
-    final tnr = report['tnr_status'] ?? l10n.label_not_applicable;
-    final ldc = report['ldc_status'] ?? l10n.label_not_applicable;
-    final ldcVal = report['ldc_value'];
-
-    String display = 'TNR: $tnr / LDC: $ldc';
-    if (ldcVal != null) {
-      display += ' (¥$ldcVal)';
-    }
-    return display;
-  }
-
-  Widget _buildReportCard(List<Widget> children) {
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
@@ -134,80 +100,221 @@ class _WeeklyReportPageState extends ConsumerState<WeeklyReportPage> {
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
-        children: children,
+        children: [
+          Text(
+            l10n.label_main_deviation,
+            style: const TextStyle(
+              fontSize: 13,
+              color: AppColors.textWeak,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            summary.dominantLabel,
+            style: const TextStyle(
+              fontSize: 24,
+              fontWeight: FontWeight.bold,
+              color: AppColors.goldMain,
+            ),
+          ),
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 16),
+            child: Divider(),
+          ),
+          Text(
+            l10n.label_conclusion,
+            style: const TextStyle(
+              fontSize: 13,
+              color: AppColors.textWeak,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            summary.conclusionText,
+            style: const TextStyle(
+              fontSize: 15,
+              color: AppColors.textSecondary,
+              height: 1.5,
+            ),
+          ),
+        ],
       ),
     );
   }
 
-  Widget _buildReportLine(
-    String title,
-    String value, {
-    bool isLongText = false,
-    bool isGold = false,
-    bool isWrap = false,
-  }) {
+  Widget _buildMetricList(BuildContext context, List<WeeklyMetric> metrics) {
+    final l10n = AppLocalizations.of(context)!;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          title,
-          style: const TextStyle(
-            fontSize: 13,
-            color: AppColors.textWeak,
-            fontWeight: FontWeight.w600,
+        Padding(
+          padding: const EdgeInsets.only(left: 4, bottom: 16),
+          child: Text(
+            l10n.label_audit_metrics,
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              color: AppColors.textMain.withOpacity(0.8),
+            ),
           ),
         ),
-        const SizedBox(height: 12),
-        isWrap
-            ? Wrap(
-                children: [
-                  Text(
-                    value,
-                    style: TextStyle(
-                      fontSize: isLongText ? 15 : 32,
-                      fontWeight: isLongText
-                          ? FontWeight.normal
-                          : FontWeight.bold,
-                      color: isLongText
-                          ? AppColors.textSecondary
-                          : (isGold ? AppColors.goldMain : AppColors.textMain),
-                      height: isLongText ? 1.5 : 1.2,
-                    ),
-                  ),
-                ],
-              )
-            : Text(
-                value,
-                maxLines: isLongText ? null : 1,
-                overflow: isLongText ? null : TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontSize: isLongText ? 15 : 32,
-                  fontWeight: isLongText ? FontWeight.normal : FontWeight.bold,
-                  color: isLongText
-                      ? AppColors.textSecondary
-                      : (isGold ? AppColors.goldMain : AppColors.textMain),
-                  height: isLongText ? 1.5 : 1.2,
-                ),
-              ),
+        ...metrics.map((m) => _buildMetricItem(context, m)),
       ],
     );
   }
 
-  String _getDeviationDisplay(BuildContext context, String? deviation) {
+  Widget _buildMetricItem(BuildContext context, WeeklyMetric metric) {
     final l10n = AppLocalizations.of(context)!;
-    switch (deviation) {
-      case 'no_plan':
-        return l10n.deviation_no_plan;
-      case 'emotion_override':
-        return l10n.deviation_emotion_override;
-      case 'forced':
-        return l10n.deviation_forced;
-      case 'none':
-        return l10n.deviation_none;
-      case 'no_trades':
-        return l10n.deviation_no_trades;
+    return InkWell(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => WeeklyMetricDetailPage(metric: metric),
+          ),
+        );
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
+        margin: const EdgeInsets.only(bottom: 12),
+        decoration: BoxDecoration(
+          color: AppColors.secondaryBlock.withOpacity(0.5),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: AppColors.border.withOpacity(0.5)),
+        ),
+        child: Column(
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Row(
+                    children: [
+                      Text(
+                        metric.key,
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.goldMain,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        '| ${metric.name}',
+                        style: const TextStyle(
+                          fontSize: 14,
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                _buildStatusBadge(l10n, metric.status),
+                const SizedBox(width: 8),
+                _buildScoreBadge(metric.score),
+              ],
+            ),
+            if (metric.status == 'triggered') ...[
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  const SizedBox(width: 4),
+                  Expanded(
+                    child: Text(
+                      _getMetricSummary(l10n, metric),
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: AppColors.textWeak,
+                      ),
+                    ),
+                  ),
+                  Text(
+                    l10n.label_evidence_count(metric.evidence.length),
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: AppColors.textWeak,
+                    ),
+                  ),
+                  const Icon(
+                    Icons.chevron_right,
+                    size: 16,
+                    color: AppColors.textWeak,
+                  ),
+                ],
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStatusBadge(AppLocalizations l10n, String status) {
+    String text;
+    Color color;
+    switch (status) {
+      case 'triggered':
+        text = l10n.status_triggered;
+        color = Colors.orange;
+        break;
+      case 'not_triggered':
+        text = l10n.status_not_triggered;
+        color = Colors.green;
+        break;
+      case 'na':
+        text = l10n.status_na;
+        color = Colors.grey;
+        break;
+      case 'insufficient_data':
+        text = l10n.status_insufficient_data;
+        color = Colors.blueGrey;
+        break;
       default:
-        return l10n.deviation_no_trades;
+        text = status;
+        color = Colors.grey;
     }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(4),
+        border: Border.all(color: color.withOpacity(0.5)),
+      ),
+      child: Text(
+        text,
+        style: TextStyle(
+          fontSize: 10,
+          color: color,
+          fontWeight: FontWeight.bold,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildScoreBadge(int? score) {
+    if (score == null) return const SizedBox.shrink();
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      decoration: BoxDecoration(
+        color: AppColors.goldMain.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.goldMain.withOpacity(0.5)),
+      ),
+      child: Text(
+        score.toString(),
+        style: const TextStyle(
+          fontSize: 12,
+          color: AppColors.goldMain,
+          fontWeight: FontWeight.bold,
+        ),
+      ),
+    );
+  }
+
+  String _getMetricSummary(AppLocalizations l10n, WeeklyMetric metric) {
+    if (metric.key == 'PCS') return l10n.label_plan_consistency_desc;
+    return metric.summaryLine;
   }
 }
