@@ -9,6 +9,7 @@ import '../../models/plan_list_item.dart';
 import 'create_plan_page.dart';
 import 'plan_detail_page.dart';
 import 'archived_plans_page.dart';
+import '../onboarding/onboarding_watchlist_page.dart';
 
 class JournalListPage extends ConsumerStatefulWidget {
   const JournalListPage({super.key});
@@ -147,6 +148,18 @@ class _JournalListPageState extends ConsumerState<JournalListPage> {
             icon: const Icon(Icons.language),
             tooltip: l10n.action_switch_language,
             onPressed: () => _showLanguageSheet(context, ref),
+          ),
+          IconButton(
+            icon: const Icon(Icons.playlist_add_check),
+            tooltip: l10n.title_manage_watchlist,
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (context) =>
+                      const OnboardingWatchlistPage(isStandalone: true),
+                ),
+              );
+            },
           ),
           IconButton(
             icon: const Icon(Icons.archive_outlined),

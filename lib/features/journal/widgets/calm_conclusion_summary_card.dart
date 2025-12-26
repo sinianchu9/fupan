@@ -29,23 +29,31 @@ class _CalmConclusionSummaryCardState extends State<CalmConclusionSummaryCard> {
 
   @override
   Widget build(BuildContext context) {
-    if (widget.result == null) return const SizedBox.shrink();
-
     final l10n = AppLocalizations.of(context)!;
-    final result = widget.result!;
-    final isFollowPlan = result.systemJudgement == 'follow_plan';
-    final isEmotion = result.systemJudgement == 'emotion_override';
+    final result = widget.result;
 
-    // 1. Determine Status Color & Icon
+    // 1. Check if settled
+    // Settled means result exists AND systemJudgement is not empty
+    final isSettled = result != null && result.systemJudgement.isNotEmpty;
+
+    if (!isSettled) {
+      return _buildNotSettledCard(l10n);
+    }
+
+    final isFollowPlan = result!.systemJudgement == 'follow_plan';
+    // isEmotion is used for logic, though not explicitly for color selection which uses isFollowPlan
+    // final isEmotion = result.systemJudgement == 'emotion_override';
+
+    // 2. Determine Status Color & Icon
     final statusColor = isFollowPlan ? Colors.green : Colors.red;
     final statusIcon = isFollowPlan
         ? Icons.check_circle_outline
         : Icons.warning_amber_rounded;
 
-    // 2. Collect Triggered Metrics (Chips)
+    // 3. Collect Triggered Metrics (Chips)
     final chips = _buildMetricChips(l10n);
 
-    // 3. Determine Linked Event
+    // 4. Determine Linked Event
     final linkedEvent = _findLinkedEvent();
 
     return Card(
@@ -76,7 +84,7 @@ class _CalmConclusionSummaryCardState extends State<CalmConclusionSummaryCard> {
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    l10n.subtitle_fact_only, // "只显示事实，不提供建议"
+                    l10n.subtitle_fact_only,
                     style: const TextStyle(
                       fontSize: 12,
                       color: AppColors.textWeak,
@@ -140,7 +148,7 @@ class _CalmConclusionSummaryCardState extends State<CalmConclusionSummaryCard> {
                     Padding(
                       padding: const EdgeInsets.only(top: 4),
                       child: Text(
-                        l10n.action_expand, // "展开"
+                        l10n.action_expand,
                         style: const TextStyle(
                           fontSize: 12,
                           color: AppColors.textWeak,
@@ -203,31 +211,109 @@ class _CalmConclusionSummaryCardState extends State<CalmConclusionSummaryCard> {
     );
   }
 
+  Widget _buildNotSettledCard(AppLocalizations l10n) {
+    return Card(
+      elevation: 0,
+      color: AppColors.secondaryBlock,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: const BorderSide(color: AppColors.border),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.balance, color: AppColors.textWeak, size: 20),
+                const SizedBox(width: 8),
+                Text(
+                  l10n.title_calm_conclusion,
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.textWeak,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: Colors.grey.withAlpha(20),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                children: [
+                  const Icon(
+                    Icons.hourglass_empty,
+                    color: Colors.grey,
+                    size: 20,
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    l10n.label_not_settled,
+                    style: const TextStyle(
+                      color: Colors.grey,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 15,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   List<Widget> _buildMetricChips(AppLocalizations l10n) {
     final chips = <Widget>[];
     final result = widget.result!;
 
-    // EPC
+    // Priority: EPC -> LDC -> TNR -> E-TNR -> E-LDC
+    // Max 2 chips
+
+    // 1. EPC
     if (result.epcOpportunityPct != null && result.epcOpportunityPct! > 0) {
       chips.add(_buildChip(l10n.label_epc, Colors.orange));
     }
 
-    // Check events for other metrics
-    final entryDev = widget.events.any(
-      (e) => e.eventStage == 'entry_deviation',
-    );
-    final entryNon = widget.events.any(
-      (e) => e.eventStage == 'entry_non_action',
-    );
-    final exitDev = widget.events.any((e) => e.eventStage == 'exit_deviation');
+    // 2. LDC (Stop Loss Deviation)
     final stopDev = widget.events.any(
       (e) => e.eventStage == 'stoploss_deviation',
     );
+    if (stopDev) {
+      chips.add(_buildChip(l10n.label_ldc, Colors.red));
+    }
+    if (chips.length >= 2) return chips;
 
-    if (entryDev) chips.add(_buildChip(l10n.label_etnr, Colors.orange));
-    if (entryNon) chips.add(_buildChip(l10n.label_eldc, Colors.red));
-    if (exitDev) chips.add(_buildChip(l10n.label_tnr, Colors.orange));
-    if (stopDev) chips.add(_buildChip(l10n.label_ldc, Colors.red));
+    // 3. TNR (Exit Deviation)
+    final exitDev = widget.events.any((e) => e.eventStage == 'exit_deviation');
+    if (exitDev) {
+      chips.add(_buildChip(l10n.label_tnr, Colors.orange));
+    }
+    if (chips.length >= 2) return chips;
+
+    // 4. E-TNR (Entry Deviation)
+    final entryDev = widget.events.any(
+      (e) => e.eventStage == 'entry_deviation',
+    );
+    if (entryDev) {
+      chips.add(_buildChip(l10n.label_etnr, Colors.orange));
+    }
+    if (chips.length >= 2) return chips;
+
+    // 5. E-LDC (Entry Non Action)
+    final entryNon = widget.events.any(
+      (e) => e.eventStage == 'entry_non_action',
+    );
+    if (entryNon) {
+      chips.add(_buildChip(l10n.label_eldc, Colors.red));
+    }
 
     return chips;
   }

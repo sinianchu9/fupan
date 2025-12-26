@@ -282,17 +282,15 @@ class _PlanDetailPageState extends ConsumerState<PlanDetailPage> {
                 children: [
                   _buildSummaryCard(context, plan),
                   const SizedBox(height: 16),
-                  if (_data!.result != null) ...[
-                    CalmConclusionSummaryCard(
-                      plan: plan,
-                      result: _data!.result,
-                      events: _data!.events,
-                      onLinkClick: (eventId) {
-                        _eventsTimelineKey.currentState?.scrollToEvent(eventId);
-                      },
-                    ),
-                    const SizedBox(height: 16),
-                  ],
+                  CalmConclusionSummaryCard(
+                    plan: plan,
+                    result: _data!.result,
+                    events: _data!.events,
+                    onLinkClick: (eventId) {
+                      _eventsTimelineKey.currentState?.scrollToEvent(eventId);
+                    },
+                  ),
+                  const SizedBox(height: 16),
                   _buildOriginalPlanCard(context, plan),
                   const SizedBox(height: 16),
                   PlanIntegrityCard(plan: plan),
@@ -548,13 +546,19 @@ class _PlanDetailPageState extends ConsumerState<PlanDetailPage> {
         width: double.infinity,
         height: 50,
         child: ElevatedButton.icon(
-          onPressed: () {
-            Navigator.push(
+          onPressed: () async {
+            final result = await Navigator.push(
               context,
               MaterialPageRoute(
-                builder: (context) => SelfAssessmentPage(planId: plan.id),
+                builder: (context) => SelfAssessmentPage(
+                  planId: plan.id,
+                  existingReview: _data?.selfReview,
+                ),
               ),
             );
+            if (result == true) {
+              _loadDetail();
+            }
           },
           icon: const Icon(Icons.assignment_outlined),
           label: Text(l10n.action_self_assessment),

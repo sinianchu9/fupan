@@ -940,4 +940,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get label_locked => '已锁定';
+
+  @override
+  String get label_not_settled => '尚未结算，暂无判定';
 }

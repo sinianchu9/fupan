@@ -163,4 +163,35 @@ class ApiClient {
     final response = await get('/reviews/self/$planId');
     return response.data['review'];
   }
+
+  // ---- Anomaly Hints ----
+  Future<List<Map<String, dynamic>>> getHints() async {
+    final response = await get('/hints');
+    return List<Map<String, dynamic>>.from(response.data['items'] ?? []);
+  }
+
+  Future<void> consumeHint(String id) async {
+    await post('/hints/$id/consume');
+  }
+
+  Future<void> dismissHint(String id) async {
+    await post('/hints/$id/dismiss');
+  }
+
+  // ---- Symbols ----
+  Future<Map<String, dynamic>> createSymbol(
+    String code,
+    String name, {
+    String? industry,
+  }) async {
+    final response = await post(
+      '/symbols/create',
+      data: {
+        'code': code,
+        'name': name,
+        if (industry != null) 'industry': industry,
+      },
+    );
+    return response.data;
+  }
 }

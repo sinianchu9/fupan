@@ -1897,6 +1897,12 @@ abstract class AppLocalizations {
   /// In zh, this message translates to:
   /// **'已锁定'**
   String get label_locked;
+
+  /// No description provided for @label_not_settled.
+  ///
+  /// In zh, this message translates to:
+  /// **'尚未结算，暂无判定'**
+  String get label_not_settled;
 }
 
 class _AppLocalizationsDelegate

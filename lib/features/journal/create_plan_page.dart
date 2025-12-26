@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:fupan/l10n/generated/app_localizations.dart';
 import '../../core/providers.dart';
+import '../../core/theme.dart';
 import '../../models/watchlist_item.dart';
+import '../plan/widgets/add_symbol_sheet.dart';
 
 class CreatePlanPage extends ConsumerStatefulWidget {
   const CreatePlanPage({super.key});
@@ -414,8 +416,39 @@ class _CreatePlanPageState extends ConsumerState<CreatePlanPage> {
             onChanged: (v) => setState(() => _selectedSymbolId = v),
           ),
         ),
+        const SizedBox(width: 8),
+        IconButton(
+          onPressed: _openAddSymbolSheet,
+          icon: const Icon(Icons.add_circle_outline, color: AppColors.goldMain),
+          tooltip: '添加股票',
+        ),
       ],
     );
+  }
+
+  Future<void> _openAddSymbolSheet() async {
+    final result = await showModalBottomSheet<Map<String, dynamic>>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => const AddSymbolSheet(),
+    );
+
+    if (result != null) {
+      // Add to local watchlist and select it
+      final newItem = WatchlistItem(
+        symbolId: result['symbolId'],
+        code: result['code'],
+        name: result['name'],
+        industry: result['industry'],
+        createdAt: DateTime.now().millisecondsSinceEpoch ~/ 1000,
+      );
+
+      setState(() {
+        _watchlist.insert(0, newItem);
+        _selectedSymbolId = newItem.symbolId;
+      });
+    }
   }
 
   Widget _buildBuyReasonTypes(BuildContext context) {

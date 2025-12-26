@@ -356,6 +356,28 @@ async function route(req: Request, env: Env): Promise<Response> {
     return ok({ inserted: stmts.length });
   }
 
+
+
+  // POST /symbols/create
+  if (method === "POST" && path === "/symbols/create") {
+    const body = await readJson(req);
+    const { code, name, industry } = body || {};
+    if (!code || !name) return bad("code and name required");
+
+    // Check if exists
+    const existing = await env.DB.prepare("SELECT id FROM symbols WHERE code = ?").bind(code).first();
+    if (existing) {
+      return ok({ id: (existing as any).id, existed: true });
+    }
+
+    const id = uuid();
+    await env.DB.prepare(
+      `INSERT INTO symbols (id, code, name, industry) VALUES (?, ?, ?, ?)`
+    ).bind(id, String(code), String(name), industry ? String(industry) : null).run();
+
+    return ok({ id, existed: false });
+  }
+
   // ---- watchlist ----
   // GET /watchlist
   if (method === "GET" && path === "/watchlist") {
@@ -567,11 +589,16 @@ if (method === "GET" && path === "/plans/archived") {
        ORDER BY edited_at ASC`
     ).bind(planId, userId).all();
 
+    const selfReview = await env.DB.prepare(
+      "SELECT * FROM trade_self_reviews WHERE plan_id = ? AND user_id = ?"
+    ).bind(planId, userId).first();
+
     return ok({
       plan,
       events: events.results || [],
       result: result || null,
       edits: edits.results || [],
+      self_review: selfReview || null,
     });
   }
 
@@ -905,6 +932,46 @@ if (method === "POST" && path.startsWith("/plans/") && path.endsWith("/add-event
     ).bind(planId, userId).first();
 
     return ok({ review: review || null });
+  }
+
+
+  // ---- anomaly hints ----
+  // GET /hints
+  if (method === "GET" && path === "/hints") {
+    const rows = await env.DB.prepare(
+      `SELECT * FROM anomaly_hints
+       WHERE user_id = ? AND status = 'open'
+       ORDER BY created_at DESC
+       LIMIT 20`
+    ).bind(userId).all();
+    return ok({ items: rows.results || [] });
+  }
+
+  // POST /hints/:id/consume
+  if (method === "POST" && path.startsWith("/hints/") && path.endsWith("/consume")) {
+    const hintId = path.split("/")[2];
+    if (!hintId) return bad("hint id required");
+
+    const ts = nowEpoch();
+    await env.DB.prepare(
+      `UPDATE anomaly_hints SET status='consumed', consumed_at=? WHERE id=? AND user_id=?`
+    ).bind(ts, hintId, userId).run();
+
+    return ok();
+  }
+
+  // POST /hints/:id/dismiss
+  if (method === "POST" && path.startsWith("/hints/") && path.endsWith("/dismiss")) {
+    const hintId = path.split("/")[2];
+    if (!hintId) return bad("hint id required");
+
+    // Dismissed hints are just marked as such, no consumed_at needed (or could use same field)
+    const ts = nowEpoch();
+    await env.DB.prepare(
+      `UPDATE anomaly_hints SET status='dismissed', consumed_at=? WHERE id=? AND user_id=?`
+    ).bind(ts, hintId, userId).run();
+
+    return ok();
   }
 
   // ---- weekly report (Audit Style) ----
@@ -1288,7 +1355,182 @@ if (method === "POST" && path.startsWith("/plans/") && path.endsWith("/add-event
   return bad("not found", 404);
 }
 
+
+// ---- Cron & Price Logic ----
+
+async function getLatestPrice(env: Env, symbol: string): Promise<{ price: number; ts: number } | null> {
+  const now = nowEpoch();
+  
+  // 1. Try Cache (D1)
+  const cached = await env.DB.prepare(
+    "SELECT price, updated_at FROM price_cache WHERE symbol = ?"
+  ).bind(symbol).first();
+
+  if (cached && (now - (cached as any).updated_at < 120)) { // 2 min TTL
+    return { price: (cached as any).price, ts: (cached as any).updated_at };
+  }
+
+  // 2. Fetch from Source (Mock for V1)
+  // In real prod, use fetch() to a provider
+  // const res = await fetch(`...`);
+  // const price = ...
+  
+  // Mock: Generate a price based on symbol char codes to be semi-stable, plus random noise
+  // This is just for demo. In real world, use a real API.
+  let seed = 0;
+  for (let i = 0; i < symbol.length; i++) seed += symbol.charCodeAt(i);
+  const basePrice = (seed % 200) + 50; // 50 - 250
+  const noise = (Math.random() * 4) - 2; // +/- 2
+  const price = Math.round((basePrice + noise) * 100) / 100;
+
+  // 3. Update Cache
+  await env.DB.prepare(
+    "INSERT OR REPLACE INTO price_cache (symbol, price, updated_at) VALUES (?, ?, ?)"
+  ).bind(symbol, price, now).run();
+
+  return { price, ts: now };
+}
+
+async function checkAnomalies(env: Env) {
+  const now = nowEpoch();
+
+  // 1. Get Active Plans (Limit 50)
+  const plans = (await env.DB.prepare(
+    `SELECT p.id, p.user_id, p.symbol_id, p.status,
+            p.target_low, p.target_high,
+            p.stop_type, p.stop_value,
+            p.planned_entry_price, p.actual_entry_price, p.entry_price,
+            s.code as symbol_code
+     FROM trade_plans p
+     JOIN symbols s ON s.id = p.symbol_id
+     WHERE p.status IN ('draft', 'armed', 'holding')
+     ORDER BY p.updated_at DESC
+     LIMIT 50`
+  ).all()).results;
+
+  for (const plan of plans) {
+    const p = plan as any;
+    const symbol = p.symbol_code;
+    const priceData = await getLatestPrice(env, symbol);
+    
+    if (!priceData) continue;
+    const price = priceData.price;
+
+    // Detect Triggers
+    const hints: { tag: string; stage: string; payload: any }[] = [];
+
+    // E-TNR: Price >= Planned * 1.01 (Only if not holding yet? Or always?)
+    // User said: "高于预算/计划价一定幅度"
+    const entryRef = p.planned_entry_price || p.entry_price;
+    if (entryRef && price >= entryRef * 1.01) {
+      hints.push({
+        tag: 'E-TNR',
+        stage: 'entry_deviation',
+        payload: { threshold: entryRef * 1.01, diff_pct: (price - entryRef) / entryRef }
+      });
+    }
+
+    // E-LDC: Price <= Planned (Opportunity)
+    if (entryRef && price <= entryRef) {
+      hints.push({
+        tag: 'E-LDC',
+        stage: 'entry_non_action',
+        payload: { threshold: entryRef, diff: entryRef - price }
+      });
+    }
+
+    // TNR: Target Range
+    if (p.target_low && p.target_high && price >= p.target_low && price <= p.target_high) {
+      hints.push({
+        tag: 'TNR',
+        stage: 'exit_non_action',
+        payload: { target_low: p.target_low, target_high: p.target_high }
+      });
+    }
+
+    // LDC: Stop Loss
+    if (p.stop_type === 'technical' || p.stop_type === 'max_loss') {
+      if (p.stop_value && price <= p.stop_value) {
+        hints.push({
+          tag: 'LDC',
+          stage: 'stoploss_deviation',
+          payload: { stop_value: p.stop_value }
+        });
+      }
+    }
+
+    // Insert Hints (Deduplicated)
+    for (const h of hints) {
+      // Check duplicate in last 60 mins
+      const dup = await env.DB.prepare(
+        `SELECT 1 FROM anomaly_hints
+         WHERE plan_id = ? AND hint_type = 'price_trigger' AND trigger_tag = ?
+         AND status = 'open' AND created_at >= ?`
+      ).bind(p.id, h.tag, now - 3600).first();
+
+      if (!dup) {
+        await env.DB.prepare(
+          `INSERT INTO anomaly_hints (
+            id, user_id, plan_id, symbol,
+            hint_type, trigger_tag, event_stage,
+            price, payload_json, status, created_at
+          ) VALUES (?, ?, ?, ?, 'price_trigger', ?, ?, ?, ?, 'open', ?)`
+        ).bind(
+          uuid(), p.user_id, p.id, symbol,
+          h.tag, h.stage,
+          price, JSON.stringify(h.payload), now
+        ).run();
+      }
+    }
+  }
+}
+
+
+async function checkEvidenceGaps(env: Env) {
+  const now = nowEpoch();
+
+  // Select closed plans with NO events
+  // Limit 20 to avoid heavy load
+  const plans = (await env.DB.prepare(
+    `SELECT p.id, p.user_id, p.symbol_id, s.code as symbol_code
+     FROM trade_plans p
+     LEFT JOIN trade_events e ON e.plan_id = p.id
+     JOIN symbols s ON s.id = p.symbol_id
+     WHERE p.status = 'closed'
+     GROUP BY p.id
+     HAVING COUNT(e.id) = 0
+     ORDER BY p.updated_at DESC
+     LIMIT 20`
+  ).all()).results;
+
+  for (const plan of plans) {
+    const p = plan as any;
+    
+    // Deduplicate: 24 hours
+    const dup = await env.DB.prepare(
+      `SELECT 1 FROM anomaly_hints
+       WHERE plan_id = ? AND hint_type = 'evidence_gap'
+       AND status = 'open' AND created_at >= ?`
+    ).bind(p.id, now - 86400).first();
+
+    if (!dup) {
+      await env.DB.prepare(
+        `INSERT INTO anomaly_hints (
+          id, user_id, plan_id, symbol,
+          hint_type, trigger_tag, event_stage,
+          price, payload_json, status, created_at
+        ) VALUES (?, ?, ?, ?, 'evidence_gap', NULL, NULL, NULL, NULL, 'open', ?)`
+      ).bind(
+        uuid(), p.user_id, p.id, p.symbol_code,
+        now
+      ).run();
+    }
+  }
+}
+
 export default {
+
+
   async fetch(req: Request, env: Env) {
     // CORS（简单粗暴，够用）
     if (req.method === "OPTIONS") {
@@ -1317,5 +1559,10 @@ export default {
         },
       });
     }
+  },
+  async scheduled(event: any, env: Env, ctx: any) {
+    // Run every 10 mins (configured in wrangler.toml)
+    await checkAnomalies(env);
+    await checkEvidenceGaps(env);
   },
 };

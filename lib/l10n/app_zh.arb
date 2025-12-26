@@ -373,5 +373,6 @@
   },
   "title_plan_integrity": "计划完整性（锁定内容）",
   "subtitle_plan_integrity": "仅表示计划是否完整，不代表执行情况",
-  "label_locked": "已锁定"
+  "label_locked": "已锁定",
+  "label_not_settled": "尚未结算，暂无判定"
 }

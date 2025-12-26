@@ -357,5 +357,6 @@
   },
   "title_plan_integrity": "Plan Integrity (Locked Content)",
   "subtitle_plan_integrity": "Indicates plan completeness, not execution status",
-  "label_locked": "Locked"
+  "label_locked": "Locked",
+  "label_not_settled": "Not settled, no judgment yet"
 }

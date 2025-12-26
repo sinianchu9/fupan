@@ -9,6 +9,7 @@ class PlanDetailResponse {
   final List<PlanEdit> edits;
   final List<TradeEvent> events;
   final TradeResult? result;
+  final Map<String, dynamic>? selfReview;
   // Step 4: events
   // Step 5: result
 
@@ -18,6 +19,7 @@ class PlanDetailResponse {
     required this.edits,
     required this.events,
     this.result,
+    this.selfReview,
   });
 
   factory PlanDetailResponse.fromJson(Map<String, dynamic> json) {
@@ -33,6 +35,7 @@ class PlanDetailResponse {
       result: json['result'] != null
           ? TradeResult.fromJson(json['result'])
           : null,
+      selfReview: json['self_review'],
     );
   }
 

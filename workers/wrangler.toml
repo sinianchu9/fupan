@@ -18,3 +18,6 @@ JWT_AUDIENCE = "fupan_app"
 binding = "DB"
 database_name = "pre_trade_journal"
 database_id = "e324f3e4-f2f6-4613-bad4-612dbda86f13"
+
+[triggers]
+crons = ["*/10 * * * *"]

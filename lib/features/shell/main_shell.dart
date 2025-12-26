@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:fupan/l10n/generated/app_localizations.dart';
 import '../journal/journal_list_page.dart';
-import '../onboarding/onboarding_watchlist_page.dart';
 import '../stats/weekly_report_page.dart';
+import '../anomaly/anomaly_page.dart';
 
 class MainShell extends StatefulWidget {
   const MainShell({super.key});
@@ -19,28 +19,11 @@ class _MainShellState extends State<MainShell> {
     final l10n = AppLocalizations.of(context)!;
     final List<Widget> pages = [
       const JournalListPage(),
-      Center(child: Text(l10n.tip_alerts_placeholder)),
+      const AnomalyPage(),
       const WeeklyReportPage(),
     ];
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text(l10n.title_journal),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.playlist_add_check),
-            tooltip: l10n.title_manage_watchlist,
-            onPressed: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (context) =>
-                      const OnboardingWatchlistPage(isStandalone: true),
-                ),
-              );
-            },
-          ),
-        ],
-      ),
       body: pages[_selectedIndex],
       bottomNavigationBar: NavigationBar(
         selectedIndex: _selectedIndex,

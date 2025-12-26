@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:fupan/l10n/generated/app_localizations.dart';
 import '../../core/providers.dart';
@@ -7,14 +8,12 @@ import '../../models/self_review.dart';
 
 class SelfAssessmentPage extends ConsumerStatefulWidget {
   final String planId;
-  final bool isReadOnly;
-  final Map<String, int>? initialScores;
+  final Map<String, dynamic>? existingReview;
 
   const SelfAssessmentPage({
     super.key,
     required this.planId,
-    this.isReadOnly = false,
-    this.initialScores,
+    this.existingReview,
   });
 
   @override
@@ -27,11 +26,22 @@ class _SelfAssessmentPageState extends ConsumerState<SelfAssessmentPage> {
   bool _isSubmitting = false;
   bool _showErrors = false;
 
+  bool get _isReadOnly => widget.existingReview != null;
+
   @override
   void initState() {
     super.initState();
-    if (widget.initialScores != null) {
-      _scores.addAll(widget.initialScores!);
+    if (widget.existingReview != null) {
+      final validKeys = DimensionDef.all.map((e) => e.key).toSet();
+      widget.existingReview!.forEach((key, value) {
+        if (!validKeys.contains(key)) return;
+
+        if (value is int) {
+          _scores[key] = value;
+        } else if (value is String) {
+          _scores[key] = int.tryParse(value) ?? 0;
+        }
+      });
     }
   }
 
@@ -60,6 +70,17 @@ class _SelfAssessmentPageState extends ConsumerState<SelfAssessmentPage> {
       }
     } catch (e) {
       if (mounted) {
+        // Handle 409 Conflict (Already submitted)
+        if (e is DioException && e.response?.statusCode == 409) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(l10n.tip_submit_success),
+            ), // Treat as success
+          );
+          Navigator.pop(context, true);
+          return;
+        }
+
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(l10n.tip_submit_failed(e.toString()))),
         );
@@ -116,7 +137,7 @@ class _SelfAssessmentPageState extends ConsumerState<SelfAssessmentPage> {
               },
             ),
           ),
-          if (!widget.isReadOnly) _buildSubmitButton(context),
+          if (!_isReadOnly) _buildSubmitButton(context),
         ],
       ),
     );
@@ -221,7 +242,7 @@ class _SelfAssessmentPageState extends ConsumerState<SelfAssessmentPage> {
                     final isSelected = score == s;
                     return Expanded(
                       child: GestureDetector(
-                        onTap: widget.isReadOnly
+                        onTap: _isReadOnly
                             ? null
                             : () => setState(() => _scores[dim.key] = s),
                         child: Container(

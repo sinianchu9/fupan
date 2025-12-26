@@ -15,7 +15,12 @@ class AddEventSheet extends ConsumerStatefulWidget {
     required this.planId,
     required this.planStatus,
     required this.onSuccess,
+    this.initialEventStage,
+    this.initialPrice,
   });
+
+  final String? initialEventStage;
+  final double? initialPrice;
 
   @override
   ConsumerState<AddEventSheet> createState() => _AddEventSheetState();
@@ -33,6 +38,17 @@ class _AddEventSheetState extends ConsumerState<AddEventSheet> {
   bool _triggeredExit = false;
   bool _isSubmitting = false;
   bool _showAdvanced = false;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.initialEventStage != null) {
+      _onStageSelected(widget.initialEventStage!);
+    }
+    if (widget.initialPrice != null) {
+      _priceController.text = widget.initialPrice.toString();
+    }
+  }
 
   @override
   void dispose() {

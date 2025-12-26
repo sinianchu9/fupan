@@ -172,4 +172,30 @@ CREATE TABLE IF NOT EXISTS trade_self_reviews (
   FOREIGN KEY (result_id) REFERENCES trade_results(plan_id) ON DELETE CASCADE
 );
 
-CREATE INDEX IF NOT EXISTS idx_self_reviews_plan ON trade_self_reviews(plan_id);
+
+-- 异动提示表（不自动生成 trade_events，只做提示）
+CREATE TABLE IF NOT EXISTS anomaly_hints (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL,
+  plan_id TEXT NOT NULL,
+  symbol TEXT NOT NULL,
+  hint_type TEXT NOT NULL,         -- 'price_trigger' | 'evidence_gap' | 'deviation_hint' | 'plan_prompt'
+  trigger_tag TEXT,                -- 'EPC'|'LDC'|'TNR'|'E-TNR'|'E-LDC' (price_trigger 使用；其他可空)
+  event_stage TEXT,                -- 建议预填：exit_non_action / stoploss_deviation 等（可空）
+  ref_event_id TEXT,               -- 关联到某条 trade_event（可空）
+  price REAL,                      -- 触发时价格（可空）
+  payload_json TEXT,               -- 扩展信息：阈值、目标区间、缺失项等（可空）
+  status TEXT NOT NULL DEFAULT 'open',  -- 'open' | 'consumed' | 'dismissed'
+  created_at INTEGER NOT NULL,
+  consumed_at INTEGER
+);
+
+CREATE INDEX IF NOT EXISTS idx_hints_user_status_created ON anomaly_hints(user_id, status, created_at DESC);
+
+CREATE TABLE IF NOT EXISTS price_cache (
+  symbol TEXT PRIMARY KEY,
+  price REAL NOT NULL,
+  updated_at INTEGER NOT NULL
+);
+
+

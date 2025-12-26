@@ -966,4 +966,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get label_locked => 'Locked';
+
+  @override
+  String get label_not_settled => 'Not settled, no judgment yet';
 }
