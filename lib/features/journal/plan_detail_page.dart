@@ -7,14 +7,13 @@ import '../../core/theme.dart';
 import '../../models/plan_detail.dart';
 import '../../models/plan_edit.dart';
 import '../../models/plan_detail_response.dart';
-import '../../models/close_plan_request.dart';
 import 'self_assessment_page.dart';
-import 'widgets/plan_compare_card.dart';
+import 'widgets/plan_integrity_card.dart';
 import 'widgets/events_timeline_card.dart';
 import 'widgets/add_event_sheet.dart';
 import 'widgets/revise_target_sheet.dart';
-import 'widgets/result_card.dart';
-import 'widgets/calm_conclusion_card.dart';
+import 'widgets/calm_conclusion_summary_card.dart';
+import 'widgets/close_trade_sheet.dart';
 
 class PlanDetailPage extends ConsumerStatefulWidget {
   final String planId;
@@ -27,6 +26,7 @@ class PlanDetailPage extends ConsumerStatefulWidget {
 class _PlanDetailPageState extends ConsumerState<PlanDetailPage> {
   bool _isLoading = true;
   PlanDetailResponse? _data;
+  final GlobalKey<EventsTimelineCardState> _eventsTimelineKey = GlobalKey();
 
   @override
   void initState() {
@@ -86,10 +86,13 @@ class _PlanDetailPageState extends ConsumerState<PlanDetailPage> {
                     decoration: InputDecoration(
                       labelText: l10n.label_close_price,
                       hintText: l10n.hint_close_price,
-                      helperText:
-                          '当前偏离: $devPercent% ${showDriver ? "(" + l10n.tip_entry_deviation_hint + ")" : ""}',
+                      helperText: plannedPrice > 0
+                          ? '计划: $plannedPrice, 输入: $price, 偏离: $devPercent% ${showDriver ? "(" + l10n.tip_entry_deviation_hint + ")" : ""}'
+                          : '未设置计划买入价，无法计算偏离',
                       helperStyle: TextStyle(
-                        color: showDriver ? Colors.orange : Colors.grey,
+                        color: (plannedPrice > 0 && showDriver)
+                            ? Colors.orange
+                            : Colors.grey,
                         fontSize: 12,
                       ),
                     ),
@@ -204,23 +207,30 @@ class _PlanDetailPageState extends ConsumerState<PlanDetailPage> {
     }
   }
 
-  Future<void> _showCloseTradeSheet(PlanDetail plan) async {
-    final result = await showModalBottomSheet<bool>(
+  void _showCloseTradeSheet(PlanDetail plan) {
+    showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      builder: (context) => _CloseTradeSheet(planId: plan.id),
+      backgroundColor: Colors.transparent,
+      builder: (context) => CloseTradeSheet(
+        planId: plan.id,
+        status: plan.status,
+        onSuccess: () {
+          _loadDetail();
+        },
+      ),
     );
-    if (result == true) {
-      _loadDetail();
-    }
   }
 
-  Future<void> _showAddEventSheet(String planId) async {
+  Future<void> _showAddEventSheet(PlanDetail plan) async {
     await showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      builder: (context) =>
-          AddEventSheet(planId: planId, onSuccess: () => _loadDetail()),
+      builder: (context) => AddEventSheet(
+        planId: plan.id,
+        planStatus: plan.status,
+        onSuccess: () => _loadDetail(),
+      ),
     );
   }
 
@@ -273,25 +283,24 @@ class _PlanDetailPageState extends ConsumerState<PlanDetailPage> {
                   _buildSummaryCard(context, plan),
                   const SizedBox(height: 16),
                   if (_data!.result != null) ...[
-                    CalmConclusionCard(
+                    CalmConclusionSummaryCard(
                       plan: plan,
                       result: _data!.result,
                       events: _data!.events,
-                    ),
-                    const SizedBox(height: 16),
-                    ResultCard(
-                      result: _data!.result!,
-                      actualEntryPrice: plan.actualEntryPrice,
+                      onLinkClick: (eventId) {
+                        _eventsTimelineKey.currentState?.scrollToEvent(eventId);
+                      },
                     ),
                     const SizedBox(height: 16),
                   ],
                   _buildOriginalPlanCard(context, plan),
                   const SizedBox(height: 16),
-                  PlanCompareCard(plan: plan, events: _data!.events),
+                  PlanIntegrityCard(plan: plan),
                   const SizedBox(height: 16),
                   EventsTimelineCard(
+                    key: _eventsTimelineKey,
                     events: _data!.events,
-                    onAddEvent: () => _showAddEventSheet(plan.id),
+                    onAddEvent: () => _showAddEventSheet(plan),
                     isReadOnly: plan.status == 'closed',
                   ),
                   const SizedBox(height: 24),
@@ -691,111 +700,6 @@ class _PlanDetailPageState extends ConsumerState<PlanDetailPage> {
         return Colors.green;
       default:
         return Colors.grey;
-    }
-  }
-}
-
-class _CloseTradeSheet extends StatefulWidget {
-  final String planId;
-  const _CloseTradeSheet({required this.planId});
-
-  @override
-  State<_CloseTradeSheet> createState() => _CloseTradeSheetState();
-}
-
-class _CloseTradeSheetState extends State<_CloseTradeSheet> {
-  final _priceController = TextEditingController();
-  final _reasonController = TextEditingController();
-  bool _isSubmitting = false;
-
-  @override
-  Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context)!;
-    return SafeArea(
-      child: SingleChildScrollView(
-        padding: EdgeInsets.only(
-          bottom: MediaQuery.of(context).viewInsets.bottom + 20,
-          left: 20,
-          right: 20,
-          top: 20,
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              l10n.action_close_trade,
-              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 20),
-            TextField(
-              controller: _priceController,
-              decoration: InputDecoration(
-                labelText: l10n.label_close_price,
-                hintText: l10n.hint_close_price,
-              ),
-              keyboardType: const TextInputType.numberWithOptions(
-                decimal: true,
-              ),
-            ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: _reasonController,
-              decoration: InputDecoration(
-                labelText: l10n.label_close_reason,
-                hintText: l10n.hint_close_reason,
-              ),
-              maxLines: 3,
-            ),
-            const SizedBox(height: 24),
-            SizedBox(
-              width: double.infinity,
-              height: 50,
-              child: ElevatedButton(
-                onPressed: _isSubmitting ? null : _submit,
-                child: _isSubmitting
-                    ? const CircularProgressIndicator(color: Colors.white)
-                    : Text(l10n.action_close_trade),
-              ),
-            ),
-            const SizedBox(height: 20),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Future<void> _submit() async {
-    final l10n = AppLocalizations.of(context)!;
-    final price = double.tryParse(_priceController.text);
-    if (price == null) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(l10n.tip_invalid_price)));
-      return;
-    }
-
-    setState(() => _isSubmitting = true);
-    try {
-      final container = ProviderScope.containerOf(context);
-      final apiClient = container.read(apiClientProvider);
-      await apiClient.closePlan(
-        widget.planId,
-        ClosePlanRequest(sellPrice: price, sellReason: _reasonController.text),
-      );
-      if (mounted) {
-        Navigator.pop(context, true);
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(l10n.tip_submit_failed(e.toString()))),
-        );
-      }
-    } finally {
-      if (mounted) {
-        setState(() => _isSubmitting = false);
-      }
     }
   }
 }

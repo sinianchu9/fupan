@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/providers.dart';
+import '../../../core/theme.dart';
 import '../../../models/close_plan_request.dart';
 
 class CloseTradeSheet extends ConsumerStatefulWidget {
@@ -72,12 +73,16 @@ class _CloseTradeSheetState extends ConsumerState<CloseTradeSheet> {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
+    return Container(
+      decoration: const BoxDecoration(
+        color: AppColors.background,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
       padding: EdgeInsets.only(
-        bottom: MediaQuery.of(context).viewInsets.bottom,
-        left: 16,
-        right: 16,
-        top: 16,
+        bottom: MediaQuery.of(context).viewInsets.bottom + 24,
+        left: 20,
+        right: 20,
+        top: 20,
       ),
       child: Form(
         key: _formKey,
@@ -86,42 +91,79 @@ class _CloseTradeSheetState extends ConsumerState<CloseTradeSheet> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: AppColors.border,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 20),
               const Text(
-                '结束交易（卖出）',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                '结算交易',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.textMain,
+                ),
               ),
               const SizedBox(height: 8),
+              Text(
+                '请录入实际成交数据，系统将自动审计执行偏差。',
+                style: TextStyle(fontSize: 13, color: AppColors.textWeak),
+              ),
+              const SizedBox(height: 20),
               if (widget.status == 'draft')
                 Container(
-                  padding: const EdgeInsets.all(8),
+                  padding: const EdgeInsets.all(12),
+                  margin: const EdgeInsets.only(bottom: 20),
                   decoration: BoxDecoration(
-                    color: Colors.orange.withValues(alpha: 0.08),
-                    borderRadius: BorderRadius.circular(4),
+                    color: Colors.orange.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: Colors.orange.withValues(alpha: 0.3),
+                    ),
                   ),
                   child: const Row(
                     children: [
                       Icon(
                         Icons.warning_amber_rounded,
-                        size: 16,
+                        size: 18,
                         color: Colors.orange,
                       ),
-                      SizedBox(width: 8),
+                      SizedBox(width: 10),
                       Expanded(
                         child: Text(
-                          '计划未武装，系统可能判为无计划',
-                          style: TextStyle(fontSize: 12, color: Colors.orange),
+                          '计划尚未武装（未建仓），此时结算将被系统判定为“无计划交易”。',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.orange,
+                            height: 1.4,
+                          ),
                         ),
                       ),
                     ],
                   ),
                 ),
-              const SizedBox(height: 16),
+
+              _buildSectionTitle('成交价格'),
               TextFormField(
                 controller: _priceController,
+                style: const TextStyle(
+                  color: AppColors.textMain,
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
                 decoration: const InputDecoration(
                   labelText: '实际卖出价',
-                  border: OutlineInputBorder(),
-                  prefixText: '¥ ',
+                  hintText: '0.00',
+                  prefixIcon: Icon(
+                    Icons.currency_yuan,
+                    color: AppColors.goldMain,
+                  ),
                 ),
                 keyboardType: const TextInputType.numberWithOptions(
                   decimal: true,
@@ -133,74 +175,90 @@ class _CloseTradeSheetState extends ConsumerState<CloseTradeSheet> {
                   return null;
                 },
               ),
-              const SizedBox(height: 20),
-              const Text(
-                '卖出原因',
-                style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 8),
-              _buildReasonRadio('follow_plan', '按计划执行'),
-              _buildReasonRadio('fear', '害怕/犹豫'),
-              _buildReasonRadio('panic', '恐慌'),
-              _buildReasonRadio('external', '外力干扰'),
-              _buildReasonRadio('other', '其他'),
-              const SizedBox(height: 20),
-              const Text(
-                'EPC 数据补全（可选）',
-                style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 8),
-              TextFormField(
-                controller: _postExitPriceController,
-                decoration: const InputDecoration(
-                  labelText: '卖出后观察期最优价',
-                  hintText: '用于计算 EPC 成本',
-                  border: OutlineInputBorder(),
-                  prefixText: '¥ ',
-                ),
-                keyboardType: const TextInputType.numberWithOptions(
-                  decimal: true,
-                ),
-              ),
-              const SizedBox(height: 12),
-              TextFormField(
-                controller: _targetPriceController,
-                decoration: const InputDecoration(
-                  labelText: '原计划卖出目标价',
-                  hintText: '若原计划未设定，可在此补填',
-                  border: OutlineInputBorder(),
-                  prefixText: '¥ ',
-                ),
-                keyboardType: const TextInputType.numberWithOptions(
-                  decimal: true,
-                ),
+              const SizedBox(height: 24),
+
+              _buildSectionTitle('卖出原因'),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  _buildReasonChip('follow_plan', '按计划执行'),
+                  _buildReasonChip('stop_loss', '严格止损'),
+                  _buildReasonChip('fear', '害怕/犹豫'),
+                  _buildReasonChip('panic', '恐慌出逃'),
+                  _buildReasonChip('external', '外力干扰'),
+                  _buildReasonChip('other', '其他'),
+                ],
               ),
               const SizedBox(height: 24),
+
+              _buildSectionTitle('EPC 审计补全 (可选)'),
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: AppColors.secondaryBlock,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: AppColors.border),
+                ),
+                child: Column(
+                  children: [
+                    TextFormField(
+                      controller: _postExitPriceController,
+                      decoration: const InputDecoration(
+                        labelText: '卖出后观察期最优价',
+                        hintText: '用于计算 EPC 机会成本',
+                      ),
+                      keyboardType: const TextInputType.numberWithOptions(
+                        decimal: true,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    TextFormField(
+                      controller: _targetPriceController,
+                      decoration: const InputDecoration(
+                        labelText: '原计划卖出目标价',
+                        hintText: '若原计划未设定，可在此补填',
+                      ),
+                      keyboardType: const TextInputType.numberWithOptions(
+                        decimal: true,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 32),
+
               SizedBox(
                 width: double.infinity,
+                height: 54,
                 child: ElevatedButton(
                   onPressed: _isSubmitting ? null : _submit,
                   style: ElevatedButton.styleFrom(
-                    padding: const EdgeInsets.all(16),
                     backgroundColor: Colors.redAccent,
                     foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    elevation: 0,
                   ),
                   child: _isSubmitting
                       ? const SizedBox(
-                          height: 20,
-                          width: 20,
+                          height: 24,
+                          width: 24,
                           child: CircularProgressIndicator(
                             strokeWidth: 2,
                             color: Colors.white,
                           ),
                         )
                       : const Text(
-                          '确认结束交易',
-                          style: TextStyle(fontWeight: FontWeight.bold),
+                          '确认结算并关闭计划',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                 ),
               ),
-              const SizedBox(height: 24),
             ],
           ),
         ),
@@ -208,27 +266,44 @@ class _CloseTradeSheetState extends ConsumerState<CloseTradeSheet> {
     );
   }
 
-  Widget _buildReasonRadio(String value, String label) {
-    return InkWell(
-      onTap: () => setState(() => _sellReason = value),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 4),
-        child: Row(
-          children: [
-            Radio<String>(
-              value: value,
-              groupValue: _sellReason,
-              onChanged: (v) {
-                if (v != null) {
-                  setState(() => _sellReason = v);
-                }
-              },
-              visualDensity: VisualDensity.compact,
-            ),
-            Text(label, style: const TextStyle(fontSize: 14)),
-          ],
+  Widget _buildSectionTitle(String title) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Text(
+        title,
+        style: const TextStyle(
+          fontSize: 14,
+          fontWeight: FontWeight.bold,
+          color: AppColors.goldMain,
+          letterSpacing: 0.5,
         ),
       ),
+    );
+  }
+
+  Widget _buildReasonChip(String value, String label) {
+    final isSelected = _sellReason == value;
+    return ChoiceChip(
+      label: Text(label),
+      selected: isSelected,
+      onSelected: (s) {
+        if (s) setState(() => _sellReason = value);
+      },
+      selectedColor: AppColors.goldMain,
+      backgroundColor: AppColors.secondaryBlock,
+      labelStyle: TextStyle(
+        color: isSelected ? Colors.white : AppColors.textSecondary,
+        fontSize: 13,
+        fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+      ),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(8),
+        side: BorderSide(
+          color: isSelected ? AppColors.goldMain : AppColors.border,
+        ),
+      ),
+      showCheckmark: false,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
     );
   }
 }

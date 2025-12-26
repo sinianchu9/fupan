@@ -649,6 +649,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get stage_exit_deviation => 'Exit Execution Deviation';
 
   @override
+  String get stage_exit_non_action => 'Target Reached Not Executed';
+
+  @override
   String get stage_stoploss_deviation => 'Stop Loss Execution Deviation';
 
   @override
@@ -713,65 +716,64 @@ class AppLocalizationsEn extends AppLocalizations {
   String get label_deviation_price => 'Deviation Price';
 
   @override
-  String get label_etnr => 'E-TNR (Chasing Cost)';
+  String get label_etnr => 'E-TNR (Chasing)';
 
   @override
-  String get label_eldc => 'E-LDC (Low Entry Missed Cost)';
+  String get label_eldc => 'E-LDC (Low Entry Missed)';
 
   @override
-  String get label_tnr => 'TNR (Target Not Sold Cost)';
+  String get label_tnr => 'TNR (Target Not Sold)';
 
   @override
-  String get label_ldc => 'LDC (Stop Loss Delay Cost)';
+  String get label_ldc => 'LDC (Stop Loss Delay)';
 
   @override
   String get title_add_event => 'Add Event';
 
   @override
-  String get label_event_summary => 'Event Summary';
+  String get label_event_summary => '事件摘要';
 
   @override
-  String get label_triggered_exit => 'Triggered Exit Condition';
+  String get label_triggered_exit => '触发退出条件';
 
   @override
-  String get btn_submit_event => 'Submit Event';
+  String get btn_submit_event => '提交事件';
 
   @override
-  String get label_plan_consistency_desc => 'Plan Consistency';
+  String get label_plan_consistency_desc => '计划一致性';
 
   @override
-  String get label_etnr_desc => 'Chasing Cost';
+  String get label_etnr_desc => '买入追高';
 
   @override
-  String get label_eldc_desc => 'Low Entry Missed Cost';
+  String get label_eldc_desc => '低位不执行';
 
   @override
-  String get label_tnr_desc => 'Target Not Sold Cost';
+  String get label_tnr_desc => '到位不卖';
 
   @override
-  String get label_ldc_desc => 'Stop Loss Delay Cost';
+  String get label_ldc_desc => '止损拖延';
 
   @override
-  String get label_epc_desc => 'Early Profit Cut Cost';
+  String get label_epc_desc => '提前卖出';
 
   @override
-  String get tip_entry_deviation_hint =>
-      'Entry price deviation detected, please record the driver';
+  String get tip_entry_deviation_hint => '检测到建仓价格偏离，请记录驱动因素';
 
   @override
-  String get label_audit_metrics => 'Core Discipline Metrics';
+  String get label_audit_metrics => '核心纪律指标';
 
   @override
-  String get label_evidence_chain => 'Evidence Chain';
+  String get label_evidence_chain => '证据链 (Evidence Chain)';
 
   @override
-  String get label_improvement_tips => 'Improvement Tips';
+  String get label_improvement_tips => '本周改进提示';
 
   @override
-  String get label_quantitative_results => 'Quantitative Results';
+  String get label_quantitative_results => '量化结果';
 
   @override
-  String get label_weekly_conclusion => 'Weekly Conclusion';
+  String get label_weekly_conclusion => '本周结论';
 
   @override
   String get label_deviation_score => 'Deviation Score';
@@ -843,4 +845,125 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get label_event_explain =>
       'Record factual evidence that affects whether the plan remains valid.';
+
+  @override
+  String get label_event_stage_prompt => 'This deviation occurred at:';
+
+  @override
+  String get label_adjust_explanation => 'Adjust Explanation (Optional)';
+
+  @override
+  String get label_system_understanding => 'System Understanding';
+
+  @override
+  String get label_triggered_exit_hint =>
+      'Check means: This event has made the original plan no longer valid, and an exit needs to be executed.';
+
+  @override
+  String get hint_fact_summary =>
+      'Write only what facts happened, not reasons or predictions (max 40 chars).';
+
+  @override
+  String get understanding_etnr =>
+      'System Understanding: The actual entry price deviated from the planned price (corresponds to E-TNR).';
+
+  @override
+  String get understanding_eldc =>
+      'System Understanding: A buying opportunity appeared, but the buy was not executed as planned (corresponds to E-LDC).';
+
+  @override
+  String get understanding_tnr =>
+      'System Understanding: Plan conditions have been verified, but the sell was not executed (corresponds to TNR).';
+
+  @override
+  String get understanding_ldc =>
+      'System Understanding: Stop loss conditions were reached, but the stop loss was not executed as planned (corresponds to LDC).';
+
+  @override
+  String get understanding_epc =>
+      'System Understanding: The plan target was not reached, and the sell was executed early (corresponds to EPC).';
+
+  @override
+  String get driver_wait_confirm => 'Waiting for confirmation';
+
+  @override
+  String get driver_loosen_budget => 'Loosening budget range';
+
+  @override
+  String get driver_emotion_swing => 'Emotional swing';
+
+  @override
+  String get driver_fear_continue_drop => 'Fear of continued drop';
+
+  @override
+  String get driver_signal_insufficient => 'Insufficient signal';
+
+  @override
+  String get driver_full_position => 'Full position';
+
+  @override
+  String get driver_no_cash => 'No cash';
+
+  @override
+  String get driver_no_plan => 'No plan at the time';
+
+  @override
+  String get driver_hold_at_target => 'Still want to hold at target';
+
+  @override
+  String get driver_raise_target => 'Temporarily raised target';
+
+  @override
+  String get driver_greed_hesitation => 'Greed and hesitation';
+
+  @override
+  String get driver_resist_stop => 'Psychological resistance to stop';
+
+  @override
+  String get driver_hope_rebound => 'Hope for rebound';
+
+  @override
+  String get driver_lower_stop => 'Lowered stop loss';
+
+  @override
+  String get driver_emotion_ignore => 'Emotionally ignoring risk';
+
+  @override
+  String get type_logic_broken_hint => 'Original plan no longer holds';
+
+  @override
+  String get type_forced_hint => 'External reason interrupted plan';
+
+  @override
+  String get type_verify_hint => 'Plan conditions reached';
+
+  @override
+  String get type_structure_change_hint => 'Original premise changed';
+
+  @override
+  String get subtitle_fact_only => 'Facts only, no advice';
+
+  @override
+  String get judgement_follow_plan => 'Follow Plan';
+
+  @override
+  String get judgement_emotion_override => 'Emotion Override';
+
+  @override
+  String get action_expand => 'Expand';
+
+  @override
+  String label_associated_event(String stage, String price) {
+    return 'Associated Event: $stage ($price)';
+  }
+
+  @override
+  String get title_plan_integrity => 'Plan Integrity (Locked Content)';
+
+  @override
+  String get subtitle_plan_integrity =>
+      'Indicates plan completeness, not execution status';
+
+  @override
+  String get label_locked => 'Locked';
 }

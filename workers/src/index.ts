@@ -28,6 +28,8 @@ interface WeeklyMetric {
     deviation_pct?: number | null;
     cost_pct?: number | null;
     delay_level?: number | null;
+    avg_deviation_pct?: number | null;
+    count?: number | null;
   };
   thresholds: {
     deviation_threshold: number;
@@ -164,22 +166,27 @@ async function getPlan(env: Env, userId: string, planId: string) {
 
 // 系统判定（MVP 版本：只评“一致性”，不评涨跌对错）
 function judge(plan: any, sellReason: string): { judgement: string; conclusion: string } {
-  // sellReason：前端传 enum，如 "follow_plan" / "fear" / "panic" / "emotion" / "external" / "other"
-  // 你也可以传 JSON，但先简单落地
   if (!plan) return { judgement: "no_plan", conclusion: "无计划，无法对照执行偏离。" };
 
-  // 如果计划状态不是 armed/holding，说明流程不完整
-  // 但仍可给结论：计划链条不完整
   if (plan.status === "draft") {
     return { judgement: "no_plan", conclusion: "计划未武装即结束，属于无计划交易。" };
   }
 
-  // 简化：follow_plan = 按计划执行；否则情绪覆盖
-  if (sellReason === "follow_plan") {
+  // 判定逻辑优化
+  if (sellReason === "follow_plan" || sellReason === "stop_loss") {
     return { judgement: "follow_plan", conclusion: "按计划执行，偏离为零。" };
   }
+  
+  if (sellReason === "external") {
+    // 外部因素触发，判定为一致执行（或中性），不计入情绪覆盖
+    return { judgement: "follow_plan", conclusion: "卖出由外部环境变化触发，属于合理的逻辑退出。" };
+  }
 
-  // 其他原因一律归类为情绪覆盖（你后续可以细分 exec_error/judge_error）
+  const emotionReasons = ["fear", "panic", "emotion", "other"];
+  if (emotionReasons.includes(sellReason)) {
+    return { judgement: "emotion_override", conclusion: `卖出原因(${sellReason})偏离计划，属于情绪覆盖计划。` };
+  }
+
   return { judgement: "emotion_override", conclusion: "卖出原因偏离计划，属于情绪覆盖计划。" };
 }
 
@@ -686,7 +693,7 @@ if (method === "POST" && path.startsWith("/plans/") && path.endsWith("/add-event
   if (String(plan.status) === "closed") return bad("closed plan is read-only", 409);
 
   const body = await readJson(req);
-  const { event_type, summary, impact_target, triggered_exit, event_stage, behavior_driver, price_at_event } = body || {};
+  const { event_type, summary, impact_target, triggered_exit, event_stage, behavior_driver, entry_driver, price_at_event } = body || {};
 
   // ✅ triggered_exit 必填（必须明确回答：是否触发退出条件）
   if (triggered_exit === undefined || triggered_exit === null) {
@@ -696,12 +703,42 @@ if (method === "POST" && path.startsWith("/plans/") && path.endsWith("/add-event
   if (!summary || !event_stage) return bad("summary and event_stage required");
 
   // 兼容旧版 event_type 和 impact_target
-  const finalEventType = event_type || "external_change";
-  const finalImpactTarget = impact_target || "buy_logic";
+  let finalEventType = event_type || "falsify";
+  let finalImpactTarget = impact_target || "buy_logic";
+
+  // --- Canonical Enum Mapping (Legacy Support) ---
+  const EVENT_TYPE_MAP: Record<string, string> = {
+    'logic_broken': 'falsify',
+    'structure_change': 'structure',
+  };
+  if (EVENT_TYPE_MAP[finalEventType]) finalEventType = EVENT_TYPE_MAP[finalEventType];
+
+  const IMPACT_TARGET_MAP: Record<string, string> = {
+    'hold': 'hold', // keep as is
+  };
+  if (IMPACT_TARGET_MAP[finalImpactTarget]) finalImpactTarget = IMPACT_TARGET_MAP[finalImpactTarget];
+
+  // --- Validation Whitelists ---
+  const VALID_EVENT_TYPES = new Set(['falsify', 'forced', 'verify', 'structure']);
+  const VALID_IMPACT_TARGETS = new Set(['buy_logic', 'hold', 'sell_logic', 'stop_loss']);
+  const VALID_EVENT_STAGES = new Set([
+    'entry_deviation', 'entry_non_action', 
+    'exit_non_action', 'stoploss_deviation', 
+    'exit_deviation', 'external_change'
+  ]);
+
+  if (!VALID_EVENT_TYPES.has(finalEventType)) return bad(`invalid event_type: ${finalEventType}`);
+  if (!VALID_IMPACT_TARGETS.has(finalImpactTarget)) return bad(`invalid impact_target: ${finalImpactTarget}`);
+  if (event_stage && !VALID_EVENT_STAGES.has(event_stage)) return bad(`invalid event_stage: ${event_stage}`);
 
   const id = uuid();
   const summaryText = String(summary).trim();
   if (!summaryText) return bad("summary required");
+
+  // --- Validation: Mandatory Price for specific stages ---
+  if ((event_stage === 'entry_deviation' || event_stage === 'exit_deviation') && price_at_event == null) {
+    return bad("price_at_event required for this stage");
+  }
 
   await env.DB.prepare(
     `INSERT INTO trade_events (id, plan_id, user_id, event_type, summary, impact_target, triggered_exit, event_stage, behavior_driver, price_at_event)
@@ -718,6 +755,18 @@ if (method === "POST" && path.startsWith("/plans/") && path.endsWith("/add-event
       price_at_event != null ? Number(price_at_event) : null
     )
     .run();
+
+  // --- Automatic Status Transitions ---
+  const ts = nowEpoch();
+  if (event_stage === 'entry_deviation' && plan.status === 'draft') {
+    // Move to armed
+    const price = price_at_event != null ? Number(price_at_event) : null;
+    const planDriver = entry_driver || behavior_driver;
+    await env.DB.prepare(
+      `UPDATE trade_plans SET status='armed', actual_entry_price=?, entry_price=?, entry_driver=?, updated_at=? WHERE id=? AND user_id=?`
+    ).bind(price, price, planDriver || null, ts, planId, userId).run();
+  }
+  // NOTE: exit_deviation auto-close removed to ensure full settlement flow via /close
 
   return ok({ id });
 }
@@ -746,7 +795,7 @@ if (method === "POST" && path.startsWith("/plans/") && path.endsWith("/add-event
 
     // Calculate EPC
     let epc_opportunity_pct = null;
-    const final_target_price = exit_plan_target_price || plan.exit_plan_target_price;
+    const final_target_price = exit_plan_target_price || plan.exit_plan_target_price || plan.target_high;
     
     if (final_target_price && Number(sell_price) < Number(final_target_price) && post_exit_best_price && Number(post_exit_best_price) > Number(sell_price)) {
       // Check for invalidation events
@@ -894,7 +943,10 @@ if (method === "POST" && path.startsWith("/plans/") && path.endsWith("/add-event
     if (planIds.size > 0) {
       const placeholders = Array.from(planIds).map(() => "?").join(",");
       plans = (await env.DB.prepare(
-        `SELECT * FROM trade_plans WHERE user_id = ? AND id IN (${placeholders})`
+        `SELECT p.*, s.code as symbol_code, s.name as symbol_name
+         FROM trade_plans p
+         LEFT JOIN symbols s ON s.id = p.symbol_id
+         WHERE p.user_id = ? AND p.id IN (${placeholders})`
       ).bind(userId, ...Array.from(planIds)).all()).results;
     }
 
@@ -922,17 +974,10 @@ if (method === "POST" && path.startsWith("/plans/") && path.endsWith("/add-event
               if (score > maxScore) maxScore = score;
               
               evidence.push({
-                type: 'plan_field',
-                id: p.id,
-                title: `${p.symbol_code} 预算价`,
-                detail: `planned_entry_price=${p.planned_entry_price}`,
-                ts: p.created_at
-              });
-              evidence.push({
                 type: 'trade',
                 id: p.id,
-                title: `${p.symbol_code} 实际建仓价`,
-                detail: `actual_entry_price=${p.actual_entry_price}`,
+                title: `${p.symbol_code} 建仓执行`,
+                detail: `预算价 ${p.planned_entry_price} → 实际建仓 ${p.actual_entry_price}`,
                 ts: p.updated_at
               });
             }
@@ -945,7 +990,7 @@ if (method === "POST" && path.startsWith("/plans/") && path.endsWith("/add-event
         name: '买入追高',
         status: na ? 'na' : (!hasData ? 'insufficient_data' : (triggered ? 'triggered' : 'not_triggered')),
         score: triggered ? Math.round(maxScore) : 0,
-        metrics: { deviation_pct: triggered ? maxScore / 1000 : null }, // Placeholder logic
+        metrics: { deviation_pct: triggered ? (maxScore / 100) * 0.10 : null }, // Correctly map score back to deviation
         thresholds: { deviation_threshold: DEVIATION_THRESHOLD, hit_epsilon: HIT_EPSILON },
         summary_line: triggered 
           ? `本周存在买入追高偏离，最大偏离幅度约 ${Math.round(maxScore/10)}%。`
@@ -1002,25 +1047,28 @@ if (method === "POST" && path.startsWith("/plans/") && path.endsWith("/add-event
       for (const p of plans) {
         if (p.target_high || p.exit_plan_target_price) {
           hasTarget = true;
-          const planEvents = events.filter((e: any) => e.plan_id === p.id && e.event_type === 'verify');
+          const planEvents = events.filter((e: any) => e.plan_id === p.id && (e.event_type === 'verify' || e.event_stage === 'exit_non_action'));
           if (planEvents.length > 0) {
             hasEvent = true;
             // Check if sold after event
             const result = results.find((r: any) => r.plan_id === p.id);
-            if (!result || result.closed_at < planEvents[0].created_at) {
+            const failEvent = events.find((e: any) => e.plan_id === p.id && e.triggered_exit);
+            
+            // TNR Definition: Target reached (verify event), but:
+            // 1. Still holding (no result)
+            // 2. OR Sold later but at a lower price (missed the target window)
+            // If sold at or above target (even later), it's NOT TNR.
+            
+            const targetPrice = p.exit_plan_target_price || p.target_high;
+            const isSoldAtTarget = result && targetPrice && result.sell_price >= targetPrice * (1 - DEVIATION_THRESHOLD);
+
+            if (!failEvent && !isSoldAtTarget) {
               triggered = true;
-              evidence.push({
-                type: 'plan_field',
-                id: p.id,
-                title: `${p.symbol_code} 卖出目标`,
-                detail: `target=${p.target_high || p.exit_plan_target_price}`,
-                ts: p.created_at
-              });
               evidence.push({
                 type: 'event',
                 id: planEvents[0].id,
-                title: '验证/兑现事件',
-                detail: planEvents[0].summary,
+                title: `${p.symbol_code} 错过止盈`,
+                detail: `目标价 ${targetPrice} (证据: ${planEvents[0].summary}) -> ${result ? '最终卖出 ' + result.sell_price : '持仓中'}`,
                 ts: planEvents[0].created_at
               });
             }
@@ -1033,10 +1081,10 @@ if (method === "POST" && path.startsWith("/plans/") && path.endsWith("/add-event
         name: '到位不卖',
         status: !hasTarget ? 'na' : (!hasEvent ? 'insufficient_data' : (triggered ? 'triggered' : 'not_triggered')),
         score: triggered ? 80 : 0,
-        metrics: {},
+        metrics: { count: triggered ? evidence.length : 0 },
         thresholds: { deviation_threshold: DEVIATION_THRESHOLD, hit_epsilon: HIT_EPSILON },
         summary_line: triggered 
-          ? "本周存在目标到位后未及时卖出的情况。"
+          ? `本周存在 ${evidence.length} 次目标到位后未及时卖出的情况。`
           : (hasEvent ? "本周目标到位后已执行卖出。" : "本周未记录目标验证事件。"),
         evidence
       };
@@ -1062,17 +1110,10 @@ if (method === "POST" && path.startsWith("/plans/") && path.endsWith("/add-event
             if (score > maxScore) maxScore = score;
 
             evidence.push({
-              type: 'plan_field',
-              id: p.id,
-              title: `${p.symbol_code} 止损价`,
-              detail: `stop_price=${p.stop_value}`,
-              ts: p.created_at
-            });
-            evidence.push({
               type: 'trade',
               id: r.plan_id,
-              title: `${p.symbol_code} 实际退出价`,
-              detail: `sell_price=${r.sell_price}`,
+              title: `${p.symbol_code} 止损执行`,
+              detail: `原定止损 ${p.stop_value} → 实际卖出 ${r.sell_price}`,
               ts: r.closed_at
             });
           }
@@ -1098,41 +1139,46 @@ if (method === "POST" && path.startsWith("/plans/") && path.endsWith("/add-event
       const evidence: Evidence[] = [];
       let triggered = false;
       let maxScore = 0;
+      let totalEpc = 0;
+      let count = 0;
       let na = true;
 
       for (const r of results) {
         const p = planMap.get(r.plan_id);
         if (p && (p.target_high || p.exit_plan_target_price)) {
           na = false;
-          const devEvent = events.find((e: any) => e.plan_id === r.plan_id && e.event_stage === 'exit_deviation');
-          const failEvent = events.find((e: any) => e.plan_id === r.plan_id && e.triggered_exit);
-          
-          if (devEvent && !failEvent) {
+          if (r.epc_opportunity_pct != null && r.epc_opportunity_pct > 0) {
             triggered = true;
-            let score = 30;
-            if (p.target_high) score = 70;
+            count++;
+            totalEpc += r.epc_opportunity_pct;
+            const score = Math.min(100, (r.epc_opportunity_pct / 0.10) * 100);
             if (score > maxScore) maxScore = score;
 
             evidence.push({
-              type: 'event',
-              id: devEvent.id,
-              title: '卖出执行偏移',
-              detail: devEvent.summary,
-              ts: devEvent.created_at
+              type: 'trade',
+              id: r.plan_id,
+              title: `${p.symbol_code} 提前卖出`,
+              detail: `偏离幅度约 ${Math.round(r.epc_opportunity_pct * 100)}%`,
+              ts: r.closed_at
             });
           }
         }
       }
 
+      const avgEpc = count > 0 ? totalEpc / count : 0;
+
       return {
         key: 'EPC',
         name: '提前卖出',
         status: na ? 'na' : (triggered ? 'triggered' : 'not_triggered'),
-        score: maxScore,
-        metrics: {},
+        score: Math.round(maxScore),
+        metrics: { 
+          avg_deviation_pct: avgEpc,
+          count: count
+        },
         thresholds: { deviation_threshold: DEVIATION_THRESHOLD, hit_epsilon: HIT_EPSILON },
         summary_line: triggered 
-          ? "本周存在非计划失效导致的提前卖出行为。"
+          ? `本周存在 ${count} 次提前卖出，平均偏离约 ${Math.round(avgEpc * 100)}%，最大偏离约 ${Math.round(maxScore/10)}%。`
           : "本周未发现明显的提前卖出偏离。",
         evidence
       };
@@ -1151,17 +1197,36 @@ if (method === "POST" && path.startsWith("/plans/") && path.endsWith("/add-event
 
       // 1. Field Integrity
       for (const p of plans) {
-        if (!p.planned_entry_price) {
-          score -= 2; // Simplified deduction
+        // Skip drafts for integrity check - they are still being written
+        if (p.status === 'draft') continue;
+
+        const hasBudget = (p.planned_entry_price != null && p.planned_entry_price > 0) || 
+                          (p.entry_price != null && p.entry_price > 0);
+        
+        if (!hasBudget) {
+          score -= 2;
           deductions.push({ type: 'plan_field', id: p.id, title: '缺失预算价', detail: p.symbol_code, ts: p.created_at });
         }
-        if (!p.target_high && !p.exit_plan_target_price) {
+
+        const hasTarget = (p.target_high != null && p.target_high > 0) || 
+                          (p.exit_plan_target_price != null && p.exit_plan_target_price > 0);
+
+        if (!hasTarget) {
           score -= 2;
           deductions.push({ type: 'plan_field', id: p.id, title: '缺失卖出目标', detail: p.symbol_code, ts: p.created_at });
         }
-        if (!p.stop_value) {
+        
+        // Type-aware stop check
+        let stopMissing = false;
+        if (p.stop_type === 'technical' || p.stop_type === 'max_loss') {
+          if (p.stop_value == null || p.stop_value <= 0) stopMissing = true;
+        } else if (p.stop_type === 'time') {
+          if (p.stop_time_days == null || p.stop_time_days <= 0) stopMissing = true;
+        }
+        
+        if (stopMissing) {
           score -= 2;
-          deductions.push({ type: 'plan_field', id: p.id, title: '缺失止损价', detail: p.symbol_code, ts: p.created_at });
+          deductions.push({ type: 'plan_field', id: p.id, title: '缺失止损条件', detail: p.symbol_code, ts: p.created_at });
         }
       }
 

@@ -45,12 +45,14 @@ class TradeEvent {
   String get typeDisplay {
     switch (eventType) {
       case 'falsify':
+      case 'logic_broken': // Legacy
         return '逻辑证伪';
       case 'forced':
         return '强制扰动';
       case 'verify':
         return '验证/兑现';
       case 'structure':
+      case 'structure_change': // Legacy
         return '市场结构变化';
       default:
         return eventType;
@@ -61,6 +63,8 @@ class TradeEvent {
     switch (impactTarget) {
       case 'buy_logic':
         return '买入逻辑';
+      case 'hold':
+        return '持仓';
       case 'sell_logic':
         return '卖出逻辑';
       case 'stop_loss':

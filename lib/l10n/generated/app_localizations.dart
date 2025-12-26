@@ -1298,6 +1298,12 @@ abstract class AppLocalizations {
   /// **'卖出执行偏移'**
   String get stage_exit_deviation;
 
+  /// No description provided for @stage_exit_non_action.
+  ///
+  /// In zh, this message translates to:
+  /// **'到位未执行'**
+  String get stage_exit_non_action;
+
   /// No description provided for @stage_stoploss_deviation.
   ///
   /// In zh, this message translates to:
@@ -1421,25 +1427,25 @@ abstract class AppLocalizations {
   /// No description provided for @label_etnr.
   ///
   /// In zh, this message translates to:
-  /// **'E-TNR (追高成本)'**
+  /// **'E-TNR (追高)'**
   String get label_etnr;
 
   /// No description provided for @label_eldc.
   ///
   /// In zh, this message translates to:
-  /// **'E-LDC (低位未买成本)'**
+  /// **'E-LDC (低位未买)'**
   String get label_eldc;
 
   /// No description provided for @label_tnr.
   ///
   /// In zh, this message translates to:
-  /// **'TNR (到位未卖成本)'**
+  /// **'TNR (到位未卖)'**
   String get label_tnr;
 
   /// No description provided for @label_ldc.
   ///
   /// In zh, this message translates to:
-  /// **'LDC (止损延迟成本)'**
+  /// **'LDC (止损延迟)'**
   String get label_ldc;
 
   /// No description provided for @title_add_event.
@@ -1475,13 +1481,13 @@ abstract class AppLocalizations {
   /// No description provided for @label_etnr_desc.
   ///
   /// In zh, this message translates to:
-  /// **'买入追高成本'**
+  /// **'买入追高'**
   String get label_etnr_desc;
 
   /// No description provided for @label_eldc_desc.
   ///
   /// In zh, this message translates to:
-  /// **'低位不执行成本'**
+  /// **'低位不执行'**
   String get label_eldc_desc;
 
   /// No description provided for @label_tnr_desc.
@@ -1499,7 +1505,7 @@ abstract class AppLocalizations {
   /// No description provided for @label_epc_desc.
   ///
   /// In zh, this message translates to:
-  /// **'提前卖出成本'**
+  /// **'提前卖出'**
   String get label_epc_desc;
 
   /// No description provided for @tip_entry_deviation_hint.
@@ -1669,6 +1675,228 @@ abstract class AppLocalizations {
   /// In zh, this message translates to:
   /// **'记录已发生且会影响计划是否继续成立的事实证据。'**
   String get label_event_explain;
+
+  /// No description provided for @label_event_stage_prompt.
+  ///
+  /// In zh, this message translates to:
+  /// **'这次偏离发生在：'**
+  String get label_event_stage_prompt;
+
+  /// No description provided for @label_adjust_explanation.
+  ///
+  /// In zh, this message translates to:
+  /// **'调整解释 (可选)'**
+  String get label_adjust_explanation;
+
+  /// No description provided for @label_system_understanding.
+  ///
+  /// In zh, this message translates to:
+  /// **'系统理解'**
+  String get label_system_understanding;
+
+  /// No description provided for @label_triggered_exit_hint.
+  ///
+  /// In zh, this message translates to:
+  /// **'勾选表示：该事件已使原计划不再成立，需要执行退出。'**
+  String get label_triggered_exit_hint;
+
+  /// No description provided for @hint_fact_summary.
+  ///
+  /// In zh, this message translates to:
+  /// **'只写发生了什么事实，不写原因或预测（40 字以内）。'**
+  String get hint_fact_summary;
+
+  /// No description provided for @understanding_etnr.
+  ///
+  /// In zh, this message translates to:
+  /// **'系统理解：本次建仓价格与计划价格存在偏离（对应 E-TNR）。'**
+  String get understanding_etnr;
+
+  /// No description provided for @understanding_eldc.
+  ///
+  /// In zh, this message translates to:
+  /// **'系统理解：买入机会已出现，但未按计划执行买入（对应 E-LDC）。'**
+  String get understanding_eldc;
+
+  /// No description provided for @understanding_tnr.
+  ///
+  /// In zh, this message translates to:
+  /// **'系统理解：计划条件已被验证，但未执行卖出（对应 TNR）。'**
+  String get understanding_tnr;
+
+  /// No description provided for @understanding_ldc.
+  ///
+  /// In zh, this message translates to:
+  /// **'系统理解：已触及止损条件，但未按计划执行止损（对应 LDC）。'**
+  String get understanding_ldc;
+
+  /// No description provided for @understanding_epc.
+  ///
+  /// In zh, this message translates to:
+  /// **'系统理解：未达到计划目标位，提前执行了卖出（对应 EPC）。'**
+  String get understanding_epc;
+
+  /// No description provided for @driver_wait_confirm.
+  ///
+  /// In zh, this message translates to:
+  /// **'等待确认信号'**
+  String get driver_wait_confirm;
+
+  /// No description provided for @driver_loosen_budget.
+  ///
+  /// In zh, this message translates to:
+  /// **'放宽预算区间'**
+  String get driver_loosen_budget;
+
+  /// No description provided for @driver_emotion_swing.
+  ///
+  /// In zh, this message translates to:
+  /// **'情绪性波动'**
+  String get driver_emotion_swing;
+
+  /// No description provided for @driver_fear_continue_drop.
+  ///
+  /// In zh, this message translates to:
+  /// **'害怕继续下跌'**
+  String get driver_fear_continue_drop;
+
+  /// No description provided for @driver_signal_insufficient.
+  ///
+  /// In zh, this message translates to:
+  /// **'信号不够明确'**
+  String get driver_signal_insufficient;
+
+  /// No description provided for @driver_full_position.
+  ///
+  /// In zh, this message translates to:
+  /// **'仓位已满'**
+  String get driver_full_position;
+
+  /// No description provided for @driver_no_cash.
+  ///
+  /// In zh, this message translates to:
+  /// **'现金不足'**
+  String get driver_no_cash;
+
+  /// No description provided for @driver_no_plan.
+  ///
+  /// In zh, this message translates to:
+  /// **'当时没计划'**
+  String get driver_no_plan;
+
+  /// No description provided for @driver_hold_at_target.
+  ///
+  /// In zh, this message translates to:
+  /// **'到位仍想持有'**
+  String get driver_hold_at_target;
+
+  /// No description provided for @driver_raise_target.
+  ///
+  /// In zh, this message translates to:
+  /// **'临时提高目标'**
+  String get driver_raise_target;
+
+  /// No description provided for @driver_greed_hesitation.
+  ///
+  /// In zh, this message translates to:
+  /// **'贪婪犹豫'**
+  String get driver_greed_hesitation;
+
+  /// No description provided for @driver_resist_stop.
+  ///
+  /// In zh, this message translates to:
+  /// **'心理抗拒止损'**
+  String get driver_resist_stop;
+
+  /// No description provided for @driver_hope_rebound.
+  ///
+  /// In zh, this message translates to:
+  /// **'心存反弹幻想'**
+  String get driver_hope_rebound;
+
+  /// No description provided for @driver_lower_stop.
+  ///
+  /// In zh, this message translates to:
+  /// **'下移止损位'**
+  String get driver_lower_stop;
+
+  /// No description provided for @driver_emotion_ignore.
+  ///
+  /// In zh, this message translates to:
+  /// **'情绪性忽视风险'**
+  String get driver_emotion_ignore;
+
+  /// No description provided for @type_logic_broken_hint.
+  ///
+  /// In zh, this message translates to:
+  /// **'原计划判断不再成立'**
+  String get type_logic_broken_hint;
+
+  /// No description provided for @type_forced_hint.
+  ///
+  /// In zh, this message translates to:
+  /// **'外部原因打断计划'**
+  String get type_forced_hint;
+
+  /// No description provided for @type_verify_hint.
+  ///
+  /// In zh, this message translates to:
+  /// **'计划条件已达成'**
+  String get type_verify_hint;
+
+  /// No description provided for @type_structure_change_hint.
+  ///
+  /// In zh, this message translates to:
+  /// **'原前提环境变了'**
+  String get type_structure_change_hint;
+
+  /// No description provided for @subtitle_fact_only.
+  ///
+  /// In zh, this message translates to:
+  /// **'只显示事实，不提供建议'**
+  String get subtitle_fact_only;
+
+  /// No description provided for @judgement_follow_plan.
+  ///
+  /// In zh, this message translates to:
+  /// **'计划一致'**
+  String get judgement_follow_plan;
+
+  /// No description provided for @judgement_emotion_override.
+  ///
+  /// In zh, this message translates to:
+  /// **'情绪覆盖计划'**
+  String get judgement_emotion_override;
+
+  /// No description provided for @action_expand.
+  ///
+  /// In zh, this message translates to:
+  /// **'展开'**
+  String get action_expand;
+
+  /// No description provided for @label_associated_event.
+  ///
+  /// In zh, this message translates to:
+  /// **'关联事件：{stage} ({price})'**
+  String label_associated_event(String stage, String price);
+
+  /// No description provided for @title_plan_integrity.
+  ///
+  /// In zh, this message translates to:
+  /// **'计划完整性（锁定内容）'**
+  String get title_plan_integrity;
+
+  /// No description provided for @subtitle_plan_integrity.
+  ///
+  /// In zh, this message translates to:
+  /// **'仅表示计划是否完整，不代表执行情况'**
+  String get subtitle_plan_integrity;
+
+  /// No description provided for @label_locked.
+  ///
+  /// In zh, this message translates to:
+  /// **'已锁定'**
+  String get label_locked;
 }
 
 class _AppLocalizationsDelegate

@@ -122,13 +122,13 @@ CREATE TABLE IF NOT EXISTS trade_events (
   id TEXT PRIMARY KEY,
   plan_id TEXT NOT NULL,
   user_id TEXT NOT NULL,
-  event_type TEXT NOT NULL,       -- falsify / forced / verify / structure (legacy)
-  event_stage TEXT,               -- entry_deviation / entry_non_action / exit_deviation / stoploss_deviation / external_change
+  event_type TEXT NOT NULL,       -- falsify / forced / verify / structure
+  event_stage TEXT,               -- entry_deviation / entry_non_action / exit_non_action / exit_deviation / stoploss_deviation / external_change
   behavior_driver TEXT,           -- fomo, fear, wait_failed, etc.
   price_at_event REAL,            -- 发生时的价格
   summary TEXT NOT NULL,          -- ≤40字
-  impact_target TEXT NOT NULL,    -- buy_logic / sell_logic / stop_loss (legacy)
-  triggered_exit INTEGER NOT NULL DEFAULT 0, -- 0/1
+  impact_target TEXT NOT NULL,    -- buy_logic / hold / sell_logic / stop_loss
+  triggered_exit INTEGER NOT NULL DEFAULT 0, -- 0/1 (是否触发退出条件)
   created_at INTEGER NOT NULL DEFAULT (unixepoch()),
   FOREIGN KEY (plan_id) REFERENCES trade_plans(id) ON DELETE CASCADE
 );

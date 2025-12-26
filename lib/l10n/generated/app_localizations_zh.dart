@@ -636,6 +636,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get stage_exit_deviation => '卖出执行偏移';
 
   @override
+  String get stage_exit_non_action => '到位未执行';
+
+  @override
   String get stage_stoploss_deviation => '止损执行偏移';
 
   @override
@@ -698,16 +701,16 @@ class AppLocalizationsZh extends AppLocalizations {
   String get label_deviation_price => '偏离价格';
 
   @override
-  String get label_etnr => 'E-TNR (追高成本)';
+  String get label_etnr => 'E-TNR (追高)';
 
   @override
-  String get label_eldc => 'E-LDC (低位未买成本)';
+  String get label_eldc => 'E-LDC (低位未买)';
 
   @override
-  String get label_tnr => 'TNR (到位未卖成本)';
+  String get label_tnr => 'TNR (到位未卖)';
 
   @override
-  String get label_ldc => 'LDC (止损延迟成本)';
+  String get label_ldc => 'LDC (止损延迟)';
 
   @override
   String get title_add_event => '新增事件';
@@ -725,10 +728,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get label_plan_consistency_desc => '计划一致性';
 
   @override
-  String get label_etnr_desc => '买入追高成本';
+  String get label_etnr_desc => '买入追高';
 
   @override
-  String get label_eldc_desc => '低位不执行成本';
+  String get label_eldc_desc => '低位不执行';
 
   @override
   String get label_tnr_desc => '到位不卖';
@@ -737,7 +740,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get label_ldc_desc => '止损拖延';
 
   @override
-  String get label_epc_desc => '提前卖出成本';
+  String get label_epc_desc => '提前卖出';
 
   @override
   String get tip_entry_deviation_hint => '检测到建仓价格偏离，请记录驱动因素';
@@ -824,4 +827,117 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get label_event_explain => '记录已发生且会影响计划是否继续成立的事实证据。';
+
+  @override
+  String get label_event_stage_prompt => '这次偏离发生在：';
+
+  @override
+  String get label_adjust_explanation => '调整解释 (可选)';
+
+  @override
+  String get label_system_understanding => '系统理解';
+
+  @override
+  String get label_triggered_exit_hint => '勾选表示：该事件已使原计划不再成立，需要执行退出。';
+
+  @override
+  String get hint_fact_summary => '只写发生了什么事实，不写原因或预测（40 字以内）。';
+
+  @override
+  String get understanding_etnr => '系统理解：本次建仓价格与计划价格存在偏离（对应 E-TNR）。';
+
+  @override
+  String get understanding_eldc => '系统理解：买入机会已出现，但未按计划执行买入（对应 E-LDC）。';
+
+  @override
+  String get understanding_tnr => '系统理解：计划条件已被验证，但未执行卖出（对应 TNR）。';
+
+  @override
+  String get understanding_ldc => '系统理解：已触及止损条件，但未按计划执行止损（对应 LDC）。';
+
+  @override
+  String get understanding_epc => '系统理解：未达到计划目标位，提前执行了卖出（对应 EPC）。';
+
+  @override
+  String get driver_wait_confirm => '等待确认信号';
+
+  @override
+  String get driver_loosen_budget => '放宽预算区间';
+
+  @override
+  String get driver_emotion_swing => '情绪性波动';
+
+  @override
+  String get driver_fear_continue_drop => '害怕继续下跌';
+
+  @override
+  String get driver_signal_insufficient => '信号不够明确';
+
+  @override
+  String get driver_full_position => '仓位已满';
+
+  @override
+  String get driver_no_cash => '现金不足';
+
+  @override
+  String get driver_no_plan => '当时没计划';
+
+  @override
+  String get driver_hold_at_target => '到位仍想持有';
+
+  @override
+  String get driver_raise_target => '临时提高目标';
+
+  @override
+  String get driver_greed_hesitation => '贪婪犹豫';
+
+  @override
+  String get driver_resist_stop => '心理抗拒止损';
+
+  @override
+  String get driver_hope_rebound => '心存反弹幻想';
+
+  @override
+  String get driver_lower_stop => '下移止损位';
+
+  @override
+  String get driver_emotion_ignore => '情绪性忽视风险';
+
+  @override
+  String get type_logic_broken_hint => '原计划判断不再成立';
+
+  @override
+  String get type_forced_hint => '外部原因打断计划';
+
+  @override
+  String get type_verify_hint => '计划条件已达成';
+
+  @override
+  String get type_structure_change_hint => '原前提环境变了';
+
+  @override
+  String get subtitle_fact_only => '只显示事实，不提供建议';
+
+  @override
+  String get judgement_follow_plan => '计划一致';
+
+  @override
+  String get judgement_emotion_override => '情绪覆盖计划';
+
+  @override
+  String get action_expand => '展开';
+
+  @override
+  String label_associated_event(String stage, String price) {
+    return '关联事件：$stage ($price)';
+  }
+
+  @override
+  String get title_plan_integrity => '计划完整性（锁定内容）';
+
+  @override
+  String get subtitle_plan_integrity => '仅表示计划是否完整，不代表执行情况';
+
+  @override
+  String get label_locked => '已锁定';
 }

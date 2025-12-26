@@ -297,6 +297,21 @@ class _CreatePlanPageState extends ConsumerState<CreatePlanPage> {
 
             _buildSectionTitle(l10n.label_sell_logic_expected),
             _buildSellConditions(context),
+            const SizedBox(height: 24),
+
+            _buildSectionTitle(l10n.label_expected_entry_price),
+            TextFormField(
+              controller: _entryPriceController,
+              decoration: InputDecoration(
+                labelText: l10n.label_expected_entry_price,
+                hintText: '输入计划买入的价格，用于计算建仓偏离',
+                border: const OutlineInputBorder(),
+              ),
+              keyboardType: const TextInputType.numberWithOptions(
+                decimal: true,
+              ),
+            ),
+            const SizedBox(height: 24),
             if (_selectedSellConditions.contains('time_take_profit')) ...[
               const SizedBox(height: 16),
               TextFormField(
@@ -334,16 +349,6 @@ class _CreatePlanPageState extends ConsumerState<CreatePlanPage> {
                   style: const TextStyle(fontSize: 14, color: Colors.grey),
                 ),
                 children: [
-                  TextFormField(
-                    controller: _entryPriceController,
-                    decoration: InputDecoration(
-                      labelText: l10n.label_expected_entry_price,
-                      border: const OutlineInputBorder(),
-                    ),
-                    keyboardType: const TextInputType.numberWithOptions(
-                      decimal: true,
-                    ),
-                  ),
                   const SizedBox(height: 16),
                   DropdownButtonFormField<String>(
                     initialValue: _direction,

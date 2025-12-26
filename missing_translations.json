@@ -1,0 +1,19 @@
+{
+  "en": [
+    "label_event_summary",
+    "label_triggered_exit",
+    "btn_submit_event",
+    "label_plan_consistency_desc",
+    "label_etnr_desc",
+    "label_eldc_desc",
+    "label_tnr_desc",
+    "label_ldc_desc",
+    "label_epc_desc",
+    "tip_entry_deviation_hint",
+    "label_audit_metrics",
+    "label_evidence_chain",
+    "label_improvement_tips",
+    "label_quantitative_results",
+    "label_weekly_conclusion"
+  ]
+}

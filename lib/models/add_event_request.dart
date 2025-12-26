@@ -5,6 +5,7 @@ class AddEventRequest {
   final bool triggeredExit;
   final String? eventStage;
   final String? behaviorDriver;
+  final String? entryDriver;
   final double? priceAtEvent;
 
   AddEventRequest({
@@ -14,6 +15,7 @@ class AddEventRequest {
     required this.triggeredExit,
     this.eventStage,
     this.behaviorDriver,
+    this.entryDriver,
     this.priceAtEvent,
   });
 
@@ -25,6 +27,7 @@ class AddEventRequest {
       'triggered_exit': triggeredExit,
       'event_stage': eventStage,
       'behavior_driver': behaviorDriver,
+      'entry_driver': entryDriver,
       'price_at_event': priceAtEvent,
     };
   }

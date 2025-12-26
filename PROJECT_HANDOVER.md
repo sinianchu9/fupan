@@ -33,7 +33,7 @@
 1. **新建计划** (`CreatePlanPage`): 录入买入逻辑、目标区间、止损条件。
 2. **建仓/武装** (`PlanDetailPage`): 录入实际入场价，计划进入“已建仓”状态，逻辑锁定。
 3. **过程记录** (`EventsTimelineCard`): **[重构]** 记录结构化事件，包含阶段、驱动因素和价格。
-4. **结束交易** (`_CloseTradeSheet`): **[增强]** 录入卖出价、原因，并可补全 EPC 计算所需的观察期最优价和原计划目标价。
+4. **结束交易** (`CloseTradeSheet`): **[增强]** 录入卖出价、原因，并可补全 EPC 计算所需的观察期最优价和原计划目标价。
 5. **系统判定** (`ResultCard`): 系统根据计划执行情况给出判定，并计算 EPC 成本。
 6. **自我评估** (`SelfAssessmentPage`): 结项后强制进行的 13 维度量化自评。
 
@@ -69,8 +69,8 @@
 
 - **目的**: 将零散记录转变为可分析的行为数据。
 - **核心字段**:
-  - **事件阶段 (`event_stage`)**: 建仓偏移、建仓未执行、卖出执行偏移、止损执行偏移、外部环境变化。
-  - **行为驱动 (`behavior_driver`)**: FOMO、无法承受回撤、情绪性恐惧、临时降低目标等。
+  - **事件阶段 (`event_stage`)**: `entry_deviation` (建仓偏移), `entry_non_action` (建仓未执行), `exit_non_action` (到位不卖), `exit_deviation` (卖出执行偏移), `stoploss_deviation` (止损执行偏移), `external_change` (外部环境变化)。
+  - **行为驱动 (`behavior_driver`)**: `fomo`, `fear`, `panic`, `wait_failed` 等。
   - **价格锚点**: 记录事件发生时的价格。
 
 ## 4. UI/UX 规范与审计修复
@@ -112,3 +112,52 @@
 - [x] **EPC 指标系统**: 完成后端计算、前端展示及数据补全。
 - [x] **结构化事件系统**: 完成事件维度重构与 UI 集成。
 - [x] **周报统计**: 集成 EPC 统计项。
+
+## 10. 工程结构 (Project Structure)
+
+```text
+fupan/
+├── lib/                        # Flutter 前端核心代码
+│   ├── core/                   # 核心基础组件
+│   │   ├── api/                # API 客户端封装 (ApiClient)
+│   │   ├── session/            # 用户会话管理 (UserSession)
+│   │   ├── providers.dart      # 全局 Riverpod Providers
+│   │   ├── locale_provider.dart # 语言切换逻辑
+│   │   └── theme.dart          # 主题与颜色规范 (AppColors, AppTheme)
+│   ├── features/               # 业务功能模块
+│   │   ├── auth/               # 登录与身份验证
+│   │   ├── journal/            # 交易复盘流 (核心模块)
+│   │   │   └── widgets/        # 模块专用组件 (AddEventSheet, ResultCard 等)
+│   │   ├── stats/              # 统计与周报页面
+│   │   ├── onboarding/         # 引导流程
+│   │   └── shell/              # 应用主外壳 (BottomNavigationBar)
+│   ├── models/                 # 数据模型 (JSON 序列化)
+│   │   ├── plan_detail.dart    # 计划详情模型
+│   │   ├── trade_event.dart    # 结构化事件模型
+│   │   ├── weekly_report.dart  # 周报统计模型
+│   │   └── ...                 # 其他业务模型
+│   ├── l10n/                   # 国际化资源文件 (ARB)
+│   └── main.dart               # 应用入口
+├── workers/                    # Cloudflare Workers 后端代码
+│   ├── src/
+│   │   ├── index.ts            # 后端主逻辑 (路由、指标计算、数据库操作)
+│   │   └── auth_utils.ts       # 身份验证工具函数
+│   ├── schema.sql              # 数据库初始化脚本
+│   └── wrangler.toml           # Workers 配置文件
+├── a11.md                      # 业务逻辑详述文档
+└── PROJECT_HANDOVER.md         # 本交接文档
+```
+
+### 关键目录说明：
+
+- **`lib/features/journal/`**: 包含交易计划的生命周期管理。`PlanDetailPage` 是核心容器，承载了从建仓到平仓的所有交互。
+- **`lib/models/`**: 定义了前后端交互的契约。所有模型均支持 `fromJson`，部分支持 `toJson`。
+- **`workers/src/index.ts`**: 包含了所有核心算法，特别是周报中的 **PCS (一致性评分)** 和 **EPC (机会成本)** 计算逻辑。
+
+---
+
+## 11. 未来扩展建议
+
+1. **多空支持优化**: 目前主要针对做多逻辑，做空逻辑的 EPC 计算需进一步验证。
+2. **图表集成**: 在 `stats` 模块引入 `fl_chart` 展示纪律评分趋势。
+3. **推送通知**: 集成 Firebase Cloud Messaging (FCM) 提醒用户及时记录事件。
