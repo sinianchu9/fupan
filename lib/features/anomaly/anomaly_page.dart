@@ -76,13 +76,20 @@ class _AnomalyPageState extends ConsumerState<AnomalyPage> {
         ? (hint['price'] as num).toDouble()
         : null;
 
+    // Infer plan status from trigger tag to show correct options in AddEventSheet
+    String planStatus = 'armed';
+    final tag = hint['trigger_tag'];
+    if (tag == 'TNR' || tag == 'LDC' || tag == 'EPC') {
+      planStatus = 'holding';
+    }
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (context) => AddEventSheet(
         planId: planId,
-        planStatus: 'armed', // Assuming armed/holding, but sheet handles logic
+        planStatus: planStatus,
         initialEventStage: eventStage,
         initialPrice: price,
         onSuccess: () {

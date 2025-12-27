@@ -494,8 +494,10 @@ class _AddEventSheetState extends ConsumerState<AddEventSheet> {
   }
 
   Widget _buildStageSelector(AppLocalizations l10n) {
-    final stages = widget.planStatus == 'draft'
-        ? ['entry_deviation', 'entry_non_action']
+    final isEntryPhase =
+        widget.planStatus == 'draft' || widget.planStatus == 'armed';
+    final stages = isEntryPhase
+        ? ['entry_deviation', 'entry_non_action', 'external_change']
         : [
             'exit_non_action',
             'stoploss_deviation',

@@ -1,0 +1,44 @@
+name: Flutter iOS Unsigned Build
+
+on:
+  push:
+    branches: [ "main" ] # 确保这里是你当前的分支名
+
+jobs:
+  build:
+    runs-on: macos-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    # 1. 安装 Flutter 环境
+    - name: Install Flutter
+      uses: subosito/flutter-action@v2
+      with:
+        flutter-version: '3.19.0' # 建议改成你本地使用的 flutter --version
+        channel: 'stable'
+
+    # 2. 获取 Flutter 依赖
+    - name: Install Dependencies
+      run: flutter pub get
+
+    # 3. 构建 iOS 产物（--no-codesign 关键：不签名）
+    - name: Build Flutter iOS
+      run: flutter build ios --release --no-codesign
+
+    # 4. 归档并转为 IPA（给爱思助手用）
+    - name: Create Unsigned IPA
+      run: |
+        mkdir -p build/ios/iphoneos/Payload
+        # 将生成的 .app 文件移动到 Payload 文件夹
+        cp -r build/ios/iphoneos/Runner.app build/ios/iphoneos/Payload/
+        cd build/ios/iphoneos
+        zip -r Runner_unsigned.ipa Payload
+
+    # 5. 上传 IPA 文件到 GitHub Artifacts
+    - name: Upload Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: flutter-unsigned-ipa
+        path: build/ios/iphoneos/Runner_unsigned.ipa
