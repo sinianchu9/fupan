@@ -13,10 +13,11 @@ jobs:
       uses: actions/checkout@v4
 
     # 1. 安装 Flutter 环境
-    - name: Install Flutter
+      - name: Install Flutter
       uses: subosito/flutter-action@v2
       with:
-        flutter-version: '3.19.0' # 建议改成你本地使用的 flutter --version
+        # 必须匹配你本地的版本，以包含 Dart 3.10.4
+        flutter-version: '3.38.5' 
         channel: 'stable'
 
     # 2. 获取 Flutter 依赖
